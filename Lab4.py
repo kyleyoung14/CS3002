@@ -55,6 +55,44 @@ def AStar(start, goal):
     return came_from
 
 
+#still needs to be altered****************
+def AStar2(start, goal):
+    global done 
+    CurrGrid = SquareGrid()
+    frontier = Queue.PriorityQueue()
+    frontier.put(start, 0)
+    came_from = {}
+    cost_so_far = {}
+    came_from[0] = start
+    cost_so_far[start] = 0
+    done = 0 
+
+    while not frontier.empty():
+        current = frontier.get()
+        
+        if done == 1:
+            break
+        results = CurrGrid.neighbors(current)
+
+        for next in CurrGrid.neighbors(current):
+            new_cost = cost_so_far[current] + 1
+            if next not in cost_so_far and heuristic(goal, next) < heuristic(goal, current):
+                cost_so_far[next] = new_cost
+                priority = new_cost + heuristic(goal, next)
+                frontier.put(next, priority)
+                #print next
+                came_from[new_cost] = current
+            if (heuristic(goal, next) < 1):
+                done = 1 
+                break
+
+    cost = new_cost + 1
+    came_from[cost] = next
+    #newPathCallback(came_from)
+    print "done"
+    #print came_from
+    return came_from
+
 def heuristic(a, b):
     (x1, y1) = a
     (x2, y2) = b 
@@ -425,7 +463,11 @@ def readGoal(msg):
     print "---"
     PathToGoal = AStar(startPos, goalPos)
     Waypoints = displayPath(PathToGoal, startPos, goalPos)
-    driveToGoal(Waypoints, startPos, goalPos)
+
+    #####possible Astar2 implementation#####
+    for i in range(len(Waypoints)):
+        Waypoints2 = Astar2(Waypoints[i], Waypoints[i+1])
+        driveToGoal(Waypoints2, Waypoints[i], Waypoints[i+1])
     print "Lab complete"
 
     
