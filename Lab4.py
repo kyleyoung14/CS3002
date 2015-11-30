@@ -18,7 +18,6 @@ import numpy
 #####============================== AStar and Path ==============================#####
 
 def AStar(start, goal):
-    global done 
     CurrGrid = SquareGrid()
     frontier = Queue.PriorityQueue()
     frontier.put(start, 0)
@@ -57,8 +56,7 @@ def AStar(start, goal):
 
 #still needs to be altered****************
 def AStar2(start, goal):
-    global done 
-    CurrGrid = SquareGrid()
+    CurrGrid = LocalGrid()
     frontier = Queue.PriorityQueue()
     frontier.put(start, 0)
     came_from = {}
@@ -92,6 +90,7 @@ def AStar2(start, goal):
     print "done"
     #print came_from
     return came_from
+
 
 def heuristic(a, b):
     (x1, y1) = a
@@ -184,8 +183,6 @@ class SquareGrid:
         #return point not in b_cells.a.cells
 
     def neighbors(self, point):
-        global flag
-
         (x, y) = point 
 
         right_cell = (x+1, y)
@@ -197,6 +194,44 @@ class SquareGrid:
         f_cells.addPoint(x, y-1, res)
         f_cells.addPoint(x-1,y, res)
         f_cells.addPoint(x, y+1, res)
+        #neighbor cells are filtered to make sure they are not an obstacle and are on the map 
+        results = [right_cell, bottom_cell, left_cell, top_cell]
+        results = filter(self.in_bounds, results)
+        results = filter(self.passable, results)
+
+        return results
+
+
+class LocalGrid:
+    def __init__(self):
+        self = mapgrid
+
+    def in_bounds(self, point):
+        currentX = point[0]
+        currentY = point[1]
+
+        return abs(currentX) < (localWidth / 2) and abs(currentY) < (localHeight / 2)
+
+    def passable(self, point):  
+
+        tmpX = int(point[0])
+        tmpY = int(point[1])
+
+        index = (localHeight*tmpY) + tmpX
+
+        return localMapData[index] < 50
+
+
+        #return point not in b_cells.a.cells
+
+    def neighbors(self, point):
+        (x, y) = point 
+
+        right_cell = (x+1, y)
+        bottom_cell = (x, y-1)
+        left_cell = (x-1, y)
+        top_cell = (x, y+1)
+
         #neighbor cells are filtered to make sure they are not an obstacle and are on the map 
         results = [right_cell, bottom_cell, left_cell, top_cell]
         results = filter(self.in_bounds, results)
@@ -413,18 +448,14 @@ def driveToGoal(waypoints, start, goal):
     length = len(waypoints)
 
     for i in range(1, length - 1):
-        print robotX
-        print robotY
-        print robotTheta
-        print "---"
+        # print robotX
+        # print robotY
+        # print robotTheta
+        # print "---"
 
         goToWaypoint(waypoints[i])
 
-    goToWaypoint(goal)
-
-    theta = thetaEnd - robotTheta 
-
-    rotate(theta) #to final pose
+    # goToWaypoint(goal)
 
 
 #####============================== Callbacks ==============================#####
@@ -463,11 +494,16 @@ def readGoal(msg):
     print "---"
     PathToGoal = AStar(startPos, goalPos)
     Waypoints = displayPath(PathToGoal, startPos, goalPos)
+    # driveToGoal(Waypoints, startPos, goalPos)
 
-    #####possible Astar2 implementation#####
-    for i in range(len(Waypoints)):
+    for i in range(0, len(Waypoints) - 2):
         Waypoints2 = Astar2(Waypoints[i], Waypoints[i+1])
         driveToGoal(Waypoints2, Waypoints[i], Waypoints[i+1])
+
+    theta = thetaEnd - robotTheta 
+
+    rotate(theta) #to final pose
+
     print "Lab complete"
 
     
@@ -585,6 +621,7 @@ if __name__ == '__main__':
     rospy.sleep(1)
 
     rospy.Timer(rospy.Duration(.2), robotLocationCallBack)
+    
 
     while (1 and not rospy.is_shutdown()):
         #publishing map data every 2 seconds
