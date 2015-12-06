@@ -1,0 +1,6 @@
+<launch>
+  <!--include file="$(find turtlebot_rviz_launchers)/launch/view_navigation.launch"-->
+  <include file="$(find turtlebot_stage)/launch/turtlebot_in_stage.launch">
+  </include>
+  <node name="lab4" pkg="kyoung_lab4" type="Lab4.py"/>
+</launch>

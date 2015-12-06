@@ -190,10 +190,10 @@ class SquareGrid:
         left_cell = (x-1, y)
         top_cell = (x, y+1)
         #add neighbor cells to frontier list
-        f_cells.addPoint(x+1,y, res)
-        f_cells.addPoint(x, y-1, res)
-        f_cells.addPoint(x-1,y, res)
-        f_cells.addPoint(x, y+1, res)
+        # f_cells.addPoint(x+1,y, res)
+        # f_cells.addPoint(x, y-1, res)
+        # f_cells.addPoint(x-1,y, res)
+        # f_cells.addPoint(x, y+1, res)
         #neighbor cells are filtered to make sure they are not an obstacle and are on the map 
         results = [right_cell, bottom_cell, left_cell, top_cell]
         results = filter(self.in_bounds, results)
@@ -477,8 +477,8 @@ def mapCallBack(data):
 
 
 def readGoal(msg):
-    px = (msg.pose.position.x - .5) / .3
-    py = msg.pose.position.y / .3
+    px = ((msg.pose.position.x - .5) / .3) + 18
+    py = (msg.pose.position.y / .3) + 18
     quat = msg.pose.orientation
     q = [quat.x, quat.y, quat.z, quat.w]
     roll, pitch, yaw = euler_from_quaternion(q)
@@ -494,10 +494,10 @@ def readGoal(msg):
     print "---"
     PathToGoal = AStar(startPos, goalPos)
     Waypoints = displayPath(PathToGoal, startPos, goalPos)
-    # driveToGoal(Waypoints, startPos, goalPos)
+    #driveToGoal(Waypoints, startPos, goalPos)
 
     for i in range(0, len(Waypoints) - 2):
-        Waypoints2 = Astar2(Waypoints[i], Waypoints[i+1])
+        Waypoints2 = AStar2(Waypoints[i], Waypoints[i+1])
         driveToGoal(Waypoints2, Waypoints[i], Waypoints[i+1])
 
     theta = thetaEnd - robotTheta 
@@ -508,8 +508,8 @@ def readGoal(msg):
 
     
 def startCallBack(data):
-    px = (data.pose.pose.position.x - .5) / .3
-    py = data.pose.pose.position.y / .3
+    px = ((data.pose.pose.position.x - .5) / .3) + 18
+    py = (data.pose.pose.position.y / .3) + 18
     quat = data.pose.pose.orientation
     q = [quat.x, quat.y, quat.z, quat.w]
     roll, pitch, yaw = euler_from_quaternion(q)
@@ -535,11 +535,11 @@ def odomCallback(data):
     geo_quat = pose.pose.orientation
 
     # Broadcast the transformation from the tf frame "base_footprint" to tf frame "odom" 
-    odom_tf.sendTransform((pose.pose.position.x, pose.pose.position.y, 0), 
-                          (pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w), 
-                          rospy.Time.now(), 
-                          "base_footprint", 
-                          "odom")
+    #odom_tf.sendTransform((pose.pose.position.x, pose.pose.position.y, 0), 
+    #                      (pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w), 
+    #                      rospy.Time.now(), 
+    #                      "base_footprint", 
+    #                      "odom")
     
 
 def localCostCallBack(data):
@@ -561,8 +561,8 @@ def robotLocationCallBack(data):
 
     odom_list.waitForTransform('map', 'base_footprint', rospy.Time(0), rospy.Duration(1.0))
     (position, orientation) = odom_list.lookupTransform('map', 'base_footprint', rospy.Time(0))
-    robotX = (position[0] - .5) / .3
-    robotY = position[1] / .3
+    robotX = ((position[0] - .5) / .3) + 18
+    robotY = (position[1] / .3) + 18
     odomW = orientation
     q = [odomW[0], odomW[1], odomW[2], odomW[3]]
     roll, pitch, yaw = euler_from_quaternion(q)
@@ -594,7 +594,7 @@ if __name__ == '__main__':
     AMap = 0
     path = 0
 
-    rospy.init_node('lab3')
+    rospy.init_node('lab4')
 
     odom_list = tf.TransformListener()
     odom_tf = tf.TransformBroadcaster()
@@ -604,7 +604,7 @@ if __name__ == '__main__':
     odomSub = rospy.Subscriber("/odom", Odometry, odomCallback)
     markerSub = rospy.Subscriber('/move_base_simple/goalrbe', PoseStamped, readGoal)
     sub = rospy.Subscriber("/start", PoseWithCovarianceStamped, startCallBack)
-    localCostSub = rospy.Subscriber("/move_base/local_stmap/costmap", OccupancyGrid, localCostCallBack)
+    localCostSub = rospy.Subscriber("/move_base/local_costmap/costmap", OccupancyGrid, localCostCallBack)
 
     pathPub = rospy.Publisher('/waypoints', GridCells, queue_size=1)
     gridPub = rospy.Publisher("/boundary", GridCells, queue_size=1)
@@ -621,6 +621,8 @@ if __name__ == '__main__':
     rospy.sleep(1)
 
     rospy.Timer(rospy.Duration(.2), robotLocationCallBack)
+
+    print "Starting"
     
 
     while (1 and not rospy.is_shutdown()):
