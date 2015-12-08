@@ -57,6 +57,7 @@ def AStar(start, goal):
 def centroidSearch(start):
 	CurrGrid = SquareGrid()
     frontier = Queue.PriorityQueue()
+    toSearch = Queue()
     done = 0
     priority = 0
     numVisited = 0
@@ -66,10 +67,14 @@ def centroidSearch(start):
 
     while not done and not rospy.is_shutdown():
     	for next in CurrGrid.allNeighbors(start):
+    		toSearch.append(next)
     		if next.unexplored() == True:
     			unknown = next
     			done = 1
     			break
+    	start = toSearch.get()
+
+    done = 0
 
    	while not done and not rospy.is_shutdown():
     	for next in CurrGrid.allNeighbors(unknown):
