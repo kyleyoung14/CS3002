@@ -82,17 +82,9 @@ def displayPath(path, start, goal):
     while(j + 1 < length):
         if(pathPoints[j][1] == pathPoints[j-1][1] and pathPoints[j][0] == pathPoints[j+1][0]):
             waypoints.append(pathPoints[j])
-            straightCounter = 0
 
         elif(pathPoints[j][0] == pathPoints[j-1][0] and pathPoints[j][1] == pathPoints[j+1][1]):
             waypoints.append(pathPoints[j])
-            straightCounter = 0
-        else:
-            straightCounter += 1
-
-        if(straightCounter == 5):
-            waypoints.append(pathPoints[j])
-            straightCounter = 0
 
         j += 1
 
@@ -211,6 +203,20 @@ def displayGrid(grid):
 
 #####============================== Movement ==============================#####
  
+def scan():
+    rotPose.pose.orientation.w -= (numpy.pi / 2)
+
+    move_pub.publish(rotPose)
+
+    while(not move_done and not rospy.is_shutdown()):
+        pass
+
+    rotPose.pose.orientation.w += (numpy.pi / 4)
+
+    move_pub.publish(rotPose)
+
+    while(not move_done and not rospy.is_shutdown()):
+        pass
 
 
 #####============================== Callbacks ==============================#####
@@ -230,6 +236,38 @@ def mapCallBack(data):
     width = data.info.width
     height = data.info.height
 
+
+def robotLocationCallBack(data):
+    global robotX
+    global robotY
+    global robotTheta
+
+    odom_list.waitForTransform('map', 'base_footprint', rospy.Time(0), rospy.Duration(1.0))
+    (position, orientation) = odom_list.lookupTransform('map', 'base_footprint', rospy.Time(0))
+    robotX = (position[0] / .3) 
+    robotY = (position[1] / .3) 
+    odomW = orientation
+    q = [odomW[0], odomW[1], odomW[2], odomW[3]]
+    roll, pitch, yaw = euler_from_quaternion(q)
+    robotTheta = yaw
+
+
+def odomCallback(data):
+    global odom_tf
+    global pose
+
+    # Set pose to to be pose of the robot
+    pose = data.pose
+    # Set geo_quat to be the orientation of the pose of the robot
+    geo_quat = pose.pose.orientation
+
+
+def statusCallBack(data):
+    global move_done
+    status = data.status_list.goal_id
+    move_done = staus == 3 or staus == 4
+
+
 #####============================== MAIN ==============================#####
 
 if __name__ == '__main__':
@@ -243,10 +281,20 @@ if __name__ == '__main__':
     global pose
     global odom_tf
     global odom_list
+    global robotX
+    global robotY
+    global robotTheta
+    global move_done
 
     rospy.init_node('lab5')
 
+    odom_list = tf.TransformListener()
+    odom_tf = tf.TransformBroadcaster()
+    odom_tf.sendTransform((0, 0, 0),(0, 0, 0, 1),rospy.Time.now(),"base_footprint","odom")
+
     worldMapSub = rospy.Subscriber('/map', OccupancyGrid, mapCallBack)
+    odomSub = rospy.Subscriber("/odom", Odometry, odomCallback)
+    baseStatusSub = rospy.Subscriber("move_base/status", GoalStatus, statusCallBack)
 
     waypoint_pub = rospy.Publisher('/waypoints', GridCells, queue_size=1)
     frontier_pub = rospy.Publisher("/frontier", GridCells, queue_size=1)            
@@ -256,6 +304,7 @@ if __name__ == '__main__':
 
 
     rospy.Timer(rospy.Duration(2), displayGrid(mapData))
+    rospy.Timer(rospy.Duration(.2), robotLocationCallBack)
 
 
     rospy.sleep(1)
@@ -263,13 +312,30 @@ if __name__ == '__main__':
     boundaries = True
 
     #rotate 360
+    rotPose = PoseStamped()
+    rotPose.pose.position.x = robotX
+    rotPose.pose.position.y = robotY
+    rotPose.pose.orientation.w = robotTheta 
 
+    for(i in range(0,3)):
+        rotPose.pose.orientation.w += (numpy.pi / 2)
+
+        move_pub.publish(rotPose)
+
+        while(not move_done and not rospy.is_shutdown()):
+            pass
+
+
+    #fill map
     while (boundaries and not rospy.is_shutdown()):
-        #AStar to boundary
+        #calculate boundary centroid
+
+        #AStar to centroid
 
         #go to first waypoint
 
         #scan
+        scan()
 
         #update boundary
         #if(no boundary):
