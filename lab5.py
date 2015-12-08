@@ -113,7 +113,7 @@ def displayPath(path, start, goal):
         w_cells.addPoint(tmpX,tmpY,res)
 
     path_pub.publish(p_cells.a)
-    pathPub.publish(w_cells.a)
+    waypoint_pub.publish(w_cells.a)
     frontier_pub.publish(f_cells.a)
 
 
@@ -187,20 +187,14 @@ class newCell:
 
 def displayGrid(grid):
     global frontier_pub
-    global unknown_pub
     global boundary_pub
-    global explored_pub
-    global e_cells
     global b_cells
     global f_cells
-    global u_cells
     global w_cells
     global p_cells
 
-    e_cells = newCell(res)
     b_cells = newCell(res)
     f_cells = newCell(res)
-    u_cells = newCell(res)
     w_cells = newCell(res)
     p_cells = newCell(res)
         
@@ -209,182 +203,14 @@ def displayGrid(grid):
         for x in range (0,width):        
             if (mapData[cell] == 100):
                 b_cells.addPoint(x,y,res)
-            #Explored is 0-99
-            else:
-                 if (0.0 <= mapData[cell] <= 99):
-                    e_cells.addPoint(x,y,res)
             cell += 1
+
     #Results are published
-    explored_pub.publish(e_cells.a) 
     boundary_pub.publish(b_cells.a)
-    unknown_pub.publish(u_cells.a)  
 
 
 #####============================== Movement ==============================#####
  
-def driveStraight(speed, distance):
-    global odom_list
-    global pose
-    global twistPub
-
-    # Set current location to (x0, y0) - Origin
-    x0 = pose.pose.position.x / .3
-    y0 = pose.pose.position.y / .3
-
-    moving = Twist()
-    stop = Twist()
-    moving.linear.x = speed
-    stop.linear.x = 0
-
-
-
-    done = False
-    while (not done and not rospy.is_shutdown()):
-        # Set current location to (x1, y1)
-        x1 = pose.pose.position.x / .3
-        y1 = pose.pose.position.y / .3
-
-        # Distance between reference frame and current frame
-        d = math.sqrt(math.pow((x1 - x0), 2) + math.pow((y1 - y0), 2))
-        
-        # Checks to see if the required distance has been attained
-        if (abs(distance - d) < 0.1):
-            # Change flag from False to True and stop the motors
-            done = True
-        
-        twistPub.publish(moving)
-        rospy.sleep(0.1)
-
-    # After driving the desired amount, stop
-    twistPub.publish(stop)
-    rospy.sleep(0.1)
-
-
-def rotate(angle):
-    global odom_list
-    global pose
-
-    CW = Twist()
-    CCW = Twist()
-    stop = Twist()
-    CW.angular.z = -.3
-    CCW.angular.z = .3
-    stop.angular.z = 0
-
-    # Extends the base class tf.Transform, adding methods for handling ROS messages
-    transformer = tf.TransformerROS()
-
-    # Create goal rotation matrix from the desired change in the angle
-    rotation = numpy.array([[math.cos(angle), -math.sin(angle), 0],
-                            [math.sin(angle),  math.cos(angle), 0],
-                            [0,                0,               1]])
-
-    # Waits for transformation from "base_footprint" to "odom" 
-    odom_list.waitForTransform('odom', 'base_footprint', rospy.Time(0), rospy.Duration(4.0))
-
-    # Returns the current frame of the robot
-    (trans, rot) = odom_list.lookupTransform('odom', 'base_footprint', rospy.Time(0))
-    
-    # Converts the current frame of the robot into a 4x4 transformation matrix
-    T_o_t = transformer.fromTranslationRotation(trans, rot)
-
-    # Retrieves the rotation matrix transform from the 4x4 transformation matrix of the current position
-    R_o_t = T_o_t[0:3, 0:3]
-
-    # Setup Goal matrix
-    # Determine rotation matrix to achieve correct rotation
-    goal_rot = numpy.dot(rotation, R_o_t)
-
-    # Set up 4x4 transformation matrix of the goal frame of the correct rotation
-    goal_o = numpy.array([[goal_rot[0,0], goal_rot[0,1], goal_rot[0,2], T_o_t[0,3]],
-                          [goal_rot[1,0], goal_rot[1,1], goal_rot[1,2], T_o_t[1,3]],
-                          [goal_rot[2,0], goal_rot[2,1], goal_rot[2,2], T_o_t[2,3]],
-                          [0,             0,             0,             1]])
-
-    # Loop until the angle between the attached frame and the origin is equal to the angle specified
-    done = False
-    while (not done and not rospy.is_shutdown()):
-        # Returns the transform from "base_footprint" to "odom"
-        (trans, rot) = odom_list.lookupTransform('odom', 'base_footprint', rospy.Time(0))
-
-        # Sets the current location to state
-        state = transformer.fromTranslationRotation(trans, rot)
- 
-        # Creates a 4x4 matrix to check to see how close every value is to the value int the desired frame
-        within_tolerance = abs((state - goal_o)) < 0.15
-     
-        # Checks to see if the current frame is close enough to the desired
-        if ( within_tolerance.all() ):
-            # If it is, stop the wheels
-            twistPub.publish(stop)
-            rospy.sleep(0.1)
-            # Set flag to be True
-            done = True
-        else:
-            # Checks to see if the desired turn was clockwise or counter clockwise
-
-            if (angle > 0):
-                # If turn was counter clockwise
-                twistPub.publish(CCW)
-                rospy.sleep(0.1)
-            else:
-                # If turn was clcokwise
-                twistPub.publish(CW)
-                rospy.sleep(0.1)
-
-
-def goToWaypoint(goal):
-    global pose
-    global robotX
-    global robotY
-
-    x0 = robotX
-    y0 = robotY
-    theta0 = robotTheta
-
-    # #current orientation
-    # quat0 = pose.pose.orientation
-    # q0 = [quat0.x, quat0.y, quat0.z, quat0.w]
-    # roll0, pitch0, yaw0 = tf.transformations.euler_from_quaternion(q0)
-    # x0 = current[0]
-    # y0 = current[1]
-    # theta0 = yaw0
-
-    #desired orientation
-    quat1 = pose.pose.orientation
-    q1 = [quat1.x, quat1.y, quat1.z, quat1.w]
-    roll1, pitch1, yaw1 = tf.transformations.euler_from_quaternion(q1)
-    x1 = goal[0]
-    y1 = goal[1]
-    theta1 = yaw1
-
-    #rotation
-    print "rotating"
-    theta2 = math.atan2(y1 - y0, x1 - x0) - theta0
-
-    rotate(theta2)
-
-    #move forward
-    print "driving"
-    dist = (((x1 - x0) ** 2) + ((y1 - y0) ** 2)) ** 0.5
-
-    print dist
-
-    driveStraight(.2, dist)
-
-    print "goToWaypoint done"
-
-
-def driveToGoal(waypoints, start, goal):
-    # goToWaypoint(waypoints[0])
-    length = len(waypoints)
-
-    for i in range(0, length - 2):
-        goToWaypoint(waypoints[i+2])
-
-     # goToWaypoint(waypoints[length-1], goal)
-
-    #rotate() to final pose
 
 
 #####============================== Callbacks ==============================#####
@@ -404,154 +230,51 @@ def mapCallBack(data):
     width = data.info.width
     height = data.info.height
 
-
-def readGoal(msg):
-    px = (msg.pose.position.x - .5) / .3
-    py = msg.pose.position.y / .3
-    quat = msg.pose.orientation
-    q = [quat.x, quat.y, quat.z, quat.w]
-    roll, pitch, yaw = euler_from_quaternion(q)
-    global xEnd
-    global yEnd
-    global thetaEnd
-    goalPos = (px, py)
-    xEnd = px
-    yEnd = py
-    thetaEnd = yaw * 180.0 / math.pi
-    print "Goal obtained"
-    print goalPos
-    print "---"
-    PathToGoal = AStar(startPos, goalPos)
-    Waypoints = displayPath(PathToGoal, startPos, goalPos)
-    driveToGoal(Waypoints, startPos, goalPos)
-
-    theta = thetaEnd - robotTheta
-    rotate(theta)
-
-    print "Lab complete"
-
-    
-def startCallBack(data):
-    px = (data.pose.pose.position.x - .5) / .3
-    py = data.pose.pose.position.y / .3
-    quat = data.pose.pose.orientation
-    q = [quat.x, quat.y, quat.z, quat.w]
-    roll, pitch, yaw = euler_from_quaternion(q)
-    global xInit
-    global yInit
-    global thetaInit
-    global startPos
-    xInit = px
-    yInit = py
-    startPos = (px, py)
-    thetaInit = yaw * 180.0 / math.pi
-    print "Start obtained"
-    print startPos
-
-
-def odomCallback(data):
-    global odom_tf
-    global pose
-
-    # Set pose to to be pose of the robot
-    pose = data.pose
-    # Set geo_quat to be the orientation of the pose of the robot
-    geo_quat = pose.pose.orientation
-
-    # Broadcast the transformation from the tf frame "base_footprint" to tf frame "odom" 
-    odom_tf.sendTransform((pose.pose.position.x, pose.pose.position.y, 0), 
-                          (pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w), 
-                          rospy.Time.now(), 
-                          "base_footprint", 
-                          "odom")
-    
-
-def localCostCallBack(data):
-    global localMapData
-    global localHeight
-    global localWidth
-    global localRes
-
-    localMapData = data.data
-    localHeight = data.info.height
-    localWidth = data.info.width
-    localRes = data.info.resolution
-
-
-
-def robotLocationCallBack(data):
-    global robotX
-    global robotY
-    global robotTheta
-
-    odom_list.waitForTransform('map', 'base_footprint', rospy.Time(0), rospy.Duration(1.0))
-    (position, orientation) = odom_list.lookupTransform('map', 'base_footprint', rospy.Time(0))
-    robotX = ((position[0] - 0.5) / 0.3)
-    robotY = (position[1] / 0.3)
-
-    odomW = orientation
-    q = [odomW[0], odomW[1], odomW[2], odomW[3]]
-    roll, pitch, yaw = euler_from_quaternion(q)
-    robotTheta = yaw
-
-
-
-
 #####============================== MAIN ==============================#####
 
 if __name__ == '__main__':
 
     global target
-    global gridPub
-    global pathPub
-    global startPos
+    global waypoint_pub
     global frontier_pub
-    global unknown_pub
     global boundary_pub
-    global explored_pub
     global path_pub
-    global twistPub
+    global move_pub
     global pose
     global odom_tf
     global odom_list
 
-    global robotX
-    global robotY
-    global robotTheta
-
-    AMap = 0
-    path = 0
-
-    rospy.init_node('lab3')
-
-    odom_list = tf.TransformListener()
-    odom_tf = tf.TransformBroadcaster()
-    odom_tf.sendTransform((0, 0, 0),(0, 0, 0, 1),rospy.Time.now(),"base_footprint","odom")
+    rospy.init_node('lab5')
 
     worldMapSub = rospy.Subscriber('/map', OccupancyGrid, mapCallBack)
-    odomSub = rospy.Subscriber("/odom", Odometry, odomCallback)
-    markerSub = rospy.Subscriber('/move_base_simple/goalrbe', PoseStamped, readGoal)
-    sub = rospy.Subscriber("/start", PoseWithCovarianceStamped, startCallBack)
-    localCostSub = rospy.Subscriber("/move_base/local_costmap/costmap", OccupancyGrid, localCostCallBack)
 
-    pathPub = rospy.Publisher('/waypoints', GridCells, queue_size=1)
-    gridPub = rospy.Publisher("/boundary", GridCells, queue_size=1)
-
+    waypoint_pub = rospy.Publisher('/waypoints', GridCells, queue_size=1)
     frontier_pub = rospy.Publisher("/frontier", GridCells, queue_size=1)            
     boundary_pub = rospy.Publisher("/boundary", GridCells, queue_size=1)
-    explored_pub = rospy.Publisher("/explored", GridCells, queue_size=1)
-    unknown_pub = rospy.Publisher("/unknown", GridCells, queue_size=1)
     path_pub = rospy.Publisher("/pathcells", GridCells, queue_size=1)
+    move_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1)
 
-    twistPub = rospy.Publisher('cmd_vel_mux/input/teleop', Twist ,queue_size=2)
 
-    rospy.Timer(rospy.Duration(0.2), robotLocationCallBack)
+    rospy.Timer(rospy.Duration(2), displayGrid(mapData))
+
 
     rospy.sleep(1)
 
-    
+    boundaries = True
 
-    while (1 and not rospy.is_shutdown()):
-        #publishing map data every 2 seconds
-        displayGrid(mapData)  
-        rospy.sleep(2)
+    #rotate 360
+
+    while (boundaries and not rospy.is_shutdown()):
+        #AStar to boundary
+
+        #go to first waypoint
+
+        #scan
+
+        #update boundary
+        #if(no boundary):
+            #boundaries = False
+        pass
+        
+
+    print "Lab Complete!"
