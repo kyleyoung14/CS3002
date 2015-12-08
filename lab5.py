@@ -230,6 +230,39 @@ def mapCallBack(data):
     width = data.info.width
     height = data.info.height
 
+def odomCallback(data):
+    global odom_tf
+    global pose
+
+    # Set pose to to be pose of the robot
+    pose = data.pose
+    # Set geo_quat to be the orientation of the pose of the robot
+    geo_quat = pose.pose.orientation
+
+    # Broadcast the transformation from the tf frame "base_footprint" to tf frame "odom" 
+    # odom_tf.sendTransform((pose.pose.position.x, pose.pose.position.y, 0), 
+    #                       (pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w), 
+    #                       rospy.Time.now(), 
+    #                       "base_footprint", 
+    #                       "odom")
+
+
+def robotLocationCallBack(data):
+    global robotX
+    global robotY
+    global robotTheta
+
+    odom_list.waitForTransform('map', 'base_footprint', rospy.Time(0), rospy.Duration(1.0))
+    (position, orientation) = odom_list.lookupTransform('map', 'base_footprint', rospy.Time(0))
+    robotX = ((position[0] - 0.5) / 0.3)
+    robotY = (position[1] / 0.3)
+
+    odomW = orientation
+    q = [odomW[0], odomW[1], odomW[2], odomW[3]]
+    roll, pitch, yaw = euler_from_quaternion(q)
+    robotTheta = yaw
+
+
 #####============================== MAIN ==============================#####
 
 if __name__ == '__main__':
@@ -243,10 +276,14 @@ if __name__ == '__main__':
     global pose
     global odom_tf
     global odom_list
+    global robotX
+    global robotY
+    global robotTheta
 
     rospy.init_node('lab5')
 
     worldMapSub = rospy.Subscriber('/map', OccupancyGrid, mapCallBack)
+    odomSub = rospy.Subscriber('/odom', Odometry, odomCallBack)
 
     waypoint_pub = rospy.Publisher('/waypoints', GridCells, queue_size=1)
     frontier_pub = rospy.Publisher("/frontier", GridCells, queue_size=1)            
@@ -256,6 +293,7 @@ if __name__ == '__main__':
 
 
     rospy.Timer(rospy.Duration(2), displayGrid(mapData))
+    rospy.Timer(rospy.Duration(2), robotLocationCallBack)
 
 
     rospy.sleep(1)
@@ -264,8 +302,21 @@ if __name__ == '__main__':
 
     #rotate 360
 
+
+    startPos = Pose()
+    goalPos = Pose()
     while (boundaries and not rospy.is_shutdown()):
         #AStar to boundary
+        startPos.pose.orientation.x = robotX
+        startPos.pose.orientation.y = robotY
+        startPos.pose.orientation.w = robotTheta
+
+        #search for next goal
+        
+
+        #run AStar
+        PathToGoal = AStar(startPos, goalPos)
+        Waypoints = displayGrid(PathToGoal, startPos, goalPos)
 
         #go to first waypoint
 
