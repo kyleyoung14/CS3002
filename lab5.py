@@ -56,35 +56,35 @@ def AStar(start, goal):
 
 def centroidSearch(start):
 	CurrGrid = SquareGrid()
-    frontier = Queue.PriorityQueue()
-    toSearch = Queue()
-    toSearch2 = Queue()
-    done = 0
-    priority = 0
-    numVisited = 0
-    visited1 = Queue()
-    visited2 = Queue()
-    unknown = Point()
+	frontier = Queue.PriorityQueue()
+	toSearch = Queue()
+	toSearch2 = Queue()
+	done = 0
+	priority = 0
+	numVisited = 0
+	visited1 = Queue()
+	visited2 = Queue()
+	unknown = Point()
 
-    while not done and not rospy.is_shutdown():
-    	for next in CurrGrid.allNeighbors(start):
-    		toSearch.append(next)
-    		if next.unexplored() == True:
-    			unknown = next
-    			done = 1
-    			break
-    	start = toSearch.get()
+	while not done and not rospy.is_shutdown():
+		for next in CurrGrid.allNeighbors(start):
+			toSearch.append(next)
+			if next.unexplored() == True:
+				unknown = next
+				done = 1
+				break
+		start = toSearch.get()
 
-    done = 0
+	done = 0
 
-   	while not done and not rospy.is_shutdown():
-    	for next in CurrGrid.unkNeighbors(unknown):
-    		toSearch2.append(next)
-    		if next not in visited2 and next.unexplored() == True:
-    			numVisited += 1
-    			visited2.append(next)
-    			#not sure if I can reference mapData like this
-    			if (mapData[next] >= 0):
+	while not done and not rospy.is_shutdown():
+		for next in CurrGrid.unkNeighbors(unknown):
+			toSearch2.append(next)
+			if next not in visited2 and next.unexplored() == True:
+				numVisited += 1
+				visited2.append(next)
+				#not sure if I can reference mapData like this
+				if (mapData[next] >= 0):
 					frontier.append(next, priority)
 					priority+=1
 		if toSearch2.empty():
@@ -99,7 +99,8 @@ def unexplored(self):
 
 	if mapData[self] == -1:
 		return True
-	else return False
+	else:
+		return False
 
 def heuristic(a, b):
     (x1, y1) = a
@@ -366,86 +367,86 @@ def statusCallBack(data):
 
 if __name__ == '__main__':
 
-    global target
-    global waypoint_pub
-    global frontier_pub
-    global boundary_pub
-    global path_pub
-    global move_pub
-    global pose
-    global odom_tf
-    global odom_list
-    global robotX
-    global robotY
-    global robotTheta
-    global move_done
+	global target
+	global waypoint_pub
+	global frontier_pub
+	global boundary_pub
+	global path_pub
+	global move_pub
+	global pose
+	global odom_tf
+	global odom_list
+	global robotX
+	global robotY
+	global robotTheta
+	global move_done
 
-    rospy.init_node('lab5')
+	rospy.init_node('lab5')
 
-    odom_list = tf.TransformListener()
-    odom_tf = tf.TransformBroadcaster()
-    odom_tf.sendTransform((0, 0, 0),(0, 0, 0, 1),rospy.Time.now(),"base_footprint","odom")
+	odom_list = tf.TransformListener()
+	odom_tf = tf.TransformBroadcaster()
+	odom_tf.sendTransform((0, 0, 0),(0, 0, 0, 1),rospy.Time.now(),"base_footprint","odom")
 
-    worldMapSub = rospy.Subscriber('/map', OccupancyGrid, mapCallBack)
-    odomSub = rospy.Subscriber('/odom', Odometry, odomCallBack)
-    baseStatusSub = rospy.Subscriber("move_base/status", GoalStatus, statusCallBack)
+	worldMapSub = rospy.Subscriber('/map', OccupancyGrid, mapCallBack)
+	odomSub = rospy.Subscriber('/odom', Odometry, odomCallBack)
+	baseStatusSub = rospy.Subscriber("move_base/status", GoalStatus, statusCallBack)
 
-    waypoint_pub = rospy.Publisher('/waypoints', GridCells, queue_size=1)
-    frontier_pub = rospy.Publisher("/frontier", GridCells, queue_size=1)            
-    boundary_pub = rospy.Publisher("/boundary", GridCells, queue_size=1)
-    path_pub = rospy.Publisher("/pathcells", GridCells, queue_size=1)
-    move_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1)
+	waypoint_pub = rospy.Publisher('/waypoints', GridCells, queue_size=1)
+	frontier_pub = rospy.Publisher("/frontier", GridCells, queue_size=1)            
+	boundary_pub = rospy.Publisher("/boundary", GridCells, queue_size=1)
+	path_pub = rospy.Publisher("/pathcells", GridCells, queue_size=1)
+	move_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1)
 
 
-    rospy.Timer(rospy.Duration(2), displayGrid(mapData))
-    rospy.Timer(rospy.Duration(2), robotLocationCallBack)
+	rospy.Timer(rospy.Duration(2), displayGrid(mapData))
+	rospy.Timer(rospy.Duration(2), robotLocationCallBack)
 
-    rospy.sleep(1)
+	rospy.sleep(1)
 
-    boundaries = True
+	boundaries = True
 
-    #rotate 360
-    rotPose = PoseStamped()
-    rotPose.pose.position.x = robotX
-    rotPose.pose.position.y = robotY
-    rotPose.pose.orientation.w = robotTheta 
+	#rotate 360
+	rotPose = PoseStamped()
+	rotPose.pose.position.x = robotX
+	rotPose.pose.position.y = robotY
+	rotPose.pose.orientation.w = robotTheta 
 
-    for(i in range(0,3)):
-        rotPose.pose.orientation.w += (numpy.pi / 2)
+	for i in range(0,3):
+		rotPose.pose.orientation.w += (numpy.pi / 2)
 
-        move_pub.publish(rotPose)
+		move_pub.publish(rotPose)
 
-		while(not move_done and not rospy.is_shutdown()):
-            pass
+		while (not move_done and not rospy.is_shutdown()):
+			pass
 
-    startPos = Pose()
-    goalPos = Pose()
+	startPos = Pose()
+	goalPos = Pose()
 
     #fill map
-    while (boundaries and not rospy.is_shutdown()):
+	while (boundaries and not rospy.is_shutdown()):
     	#calculate boundary centroid
 
         #AStar to centroid
-        startPos.pose.orientation.x = robotX
-        startPos.pose.orientation.y = robotY
-        startPos.pose.orientation.w = robotTheta
+		startPos.pose.position.x = robotX
+		startPos.pose.position.y = robotY
+		startPos.pose.orientation.w = robotTheta
 
         #search for next goal
         
 
         #run AStar
-        PathToGoal = AStar(startPos, goalPos)
-        Waypoints = displayGrid(PathToGoal, startPos, goalPos)
+		PathToGoal = AStar(startPos, goalPos)
+		Waypoints = displayGrid(PathToGoal, startPos, goalPos)
 
         #go to first waypoint
 
         #scan
-        scan()
+		scan()
 
         #update boundary
         #if(no boundary):
             #boundaries = False
-        pass
+		pass
         
 
-    print "Lab Complete!"
+	print "Lab Complete!"
