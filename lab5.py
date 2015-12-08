@@ -54,6 +54,43 @@ def AStar(start, goal):
     #print came_from
     return came_from
 
+def centroidSearch(start):
+	CurrGrid = SquareGrid()
+    frontier = Queue.PriorityQueue()
+    done = 0
+    priority = 0
+    numVisited = 0
+    visited1 = Queue()
+    visited2 = Queue()
+    unknown = Point()
+
+    while not done and not rospy.is_shutdown():
+    	for next in CurrGrid.allNeighbors(start):
+    		if next.unexplored() == True:
+    			unknown = next
+    			done = 1
+    			break
+
+   	while not done and not rospy.is_shutdown():
+    	for next in CurrGrid.allNeighbors(unknown):
+    		#line below is still partly psuedo code
+    		if next not in visited2 and next.unexplored() == True:
+    			numVisited += 1
+    			visited2.append(next)
+    			if (mapData[CurrGrid.allNeighbors(next)] >= 0 and mapData[CurrGrid.allNeighbors(next)] < 90):
+					frontier.append(next, priority)
+					priority+=1
+
+							
+
+
+
+def unexplored(self):
+	global mapData
+
+	if mapData[self] == -1:
+		return True
+	else return False
 
 def heuristic(a, b):
     (x1, y1) = a
@@ -157,6 +194,26 @@ class SquareGrid:
 
         return results
 
+        def allNeighbors(self, point):
+        global flag
+
+        (x, y) = point 
+
+        right_cell = (x+1, y)
+        bottom_cell = (x, y-1)
+        left_cell = (x-1, y)
+        top_cell = (x, y+1)
+        #add neighbor cells to frontier list
+        f_cells.addPoint(x+1,y, res)
+        f_cells.addPoint(x, y-1, res)
+        f_cells.addPoint(x-1,y, res)
+        f_cells.addPoint(x, y+1, res)
+        #neighbor cells are filtered to make sure they are not an obstacle and are on the map 
+        results = [right_cell, bottom_cell, left_cell, top_cell]
+        results = filter(self.in_bounds, results)
+
+        return results
+
 
 class newCell:
     def __init__(self, size):
@@ -235,7 +292,7 @@ def mapCallBack(data):
     mapData = data.data
     width = data.info.width
     height = data.info.height
-    
+
 
 def robotLocationCallBack(data):
     global robotX
