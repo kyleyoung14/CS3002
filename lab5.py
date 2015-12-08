@@ -58,6 +58,7 @@ def centroidSearch(start):
 	CurrGrid = SquareGrid()
     frontier = Queue.PriorityQueue()
     toSearch = Queue()
+    toSearch2 = Queue()
     done = 0
     priority = 0
     numVisited = 0
@@ -77,14 +78,17 @@ def centroidSearch(start):
     done = 0
 
    	while not done and not rospy.is_shutdown():
-    	for next in CurrGrid.allNeighbors(unknown):
-    		#line below is still partly psuedo code
+    	for next in CurrGrid.unkNeighbors(unknown):
+    		toSearch2.append(next)
     		if next not in visited2 and next.unexplored() == True:
     			numVisited += 1
     			visited2.append(next)
-    			if (mapData[CurrGrid.allNeighbors(next)] >= 0 and mapData[CurrGrid.allNeighbors(next)] < 90):
+    			#not sure if I can reference mapData like this
+    			if (mapData[next] >= 0):
 					frontier.append(next, priority)
 					priority+=1
+		if toSearch2.empty():
+			done = 1
 
 							
 
@@ -175,6 +179,13 @@ class SquareGrid:
 
         return 100 != mapData[index]
 
+    def notPassable(self, point):
+    	tmpX = int(point[0])
+        tmpY = int(point[1])
+
+        index = (37*tmpY) + tmpX
+
+        return (mapData[index] > 90)
 
         #return point not in b_cells.a.cells
 
@@ -199,7 +210,7 @@ class SquareGrid:
 
         return results
 
-        def allNeighbors(self, point):
+    def allNeighbors(self, point):
         global flag
 
         (x, y) = point 
@@ -216,6 +227,27 @@ class SquareGrid:
         #neighbor cells are filtered to make sure they are not an obstacle and are on the map 
         results = [right_cell, bottom_cell, left_cell, top_cell]
         results = filter(self.in_bounds, results)
+
+        return results
+
+    def unkNeighbors(self, point):
+        global flag
+
+        (x, y) = point 
+
+        right_cell = (x+1, y)
+        bottom_cell = (x, y-1)
+        left_cell = (x-1, y)
+        top_cell = (x, y+1)
+        #add neighbor cells to frontier list
+        f_cells.addPoint(x+1,y, res)
+        f_cells.addPoint(x, y-1, res)
+        f_cells.addPoint(x-1,y, res)
+        f_cells.addPoint(x, y+1, res)
+        #neighbor cells are filtered to make sure they are not an obstacle and are on the map 
+        results = [right_cell, bottom_cell, left_cell, top_cell]
+        results = filter(self.in_bounds, results)
+        results = filter(self.notPassable, results)
 
         return results
 
