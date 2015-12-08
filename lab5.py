@@ -6,6 +6,7 @@ import roslib
 import time
 import math
 import Queue
+import actionlib_msgs
 from nav_msgs.msg import OccupancyGrid, GridCells, Path, Odometry
 from geometry_msgs.msg import Point, Pose, PoseStamped, Twist, PoseWithCovarianceStamped, Quaternion
 from tf.transformations import euler_from_quaternion
@@ -54,6 +55,7 @@ def AStar(start, goal):
     #print came_from
     return came_from
 
+
 def centroidSearch(start):
 	CurrGrid = SquareGrid()
 	frontier = Queue.PriorityQueue()
@@ -90,9 +92,6 @@ def centroidSearch(start):
 		if toSearch2.empty():
 			done = 1
 
-							
-
-
 
 def unexplored(self):
 	global mapData
@@ -101,6 +100,7 @@ def unexplored(self):
 		return True
 	else:
 		return False
+
 
 def heuristic(a, b):
     (x1, y1) = a
@@ -347,7 +347,7 @@ def robotLocationCallBack(data):
     robotTheta = yaw
 
 
-def odomCallback(data):
+def odomCallBack(data):
     global odom_tf
     global pose
 
@@ -389,7 +389,7 @@ if __name__ == '__main__':
 
 	worldMapSub = rospy.Subscriber('/map', OccupancyGrid, mapCallBack)
 	odomSub = rospy.Subscriber('/odom', Odometry, odomCallBack)
-	baseStatusSub = rospy.Subscriber("move_base/status", GoalStatus, statusCallBack)
+	baseStatusSub = rospy.Subscriber("move_base/status", GoalStatusArray, statusCallBack)
 
 	waypoint_pub = rospy.Publisher('/waypoints', GridCells, queue_size=1)
 	frontier_pub = rospy.Publisher("/frontier", GridCells, queue_size=1)            
