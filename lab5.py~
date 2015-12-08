@@ -18,7 +18,6 @@ import numpy
 #####============================== AStar and Path ==============================#####
 
 def AStar(start, goal):
-    global done 
     CurrGrid = SquareGrid()
     frontier = Queue.PriorityQueue()
     frontier.put(start, 0)
@@ -78,6 +77,7 @@ def displayPath(path, start, goal):
     length = len(path)
 
     waypoints.append(start)
+    straightCounter = 0
 
     while(j + 1 < length):
         if(pathPoints[j][1] == pathPoints[j-1][1] and pathPoints[j][0] == pathPoints[j+1][0]):
@@ -145,8 +145,6 @@ class SquareGrid:
         #return point not in b_cells.a.cells
 
     def neighbors(self, point):
-        global flag
-
         (x, y) = point 
 
         right_cell = (x+1, y)
@@ -154,10 +152,48 @@ class SquareGrid:
         left_cell = (x-1, y)
         top_cell = (x, y+1)
         #add neighbor cells to frontier list
-        f_cells.addPoint(x+1,y, res)
-        f_cells.addPoint(x, y-1, res)
-        f_cells.addPoint(x-1,y, res)
-        f_cells.addPoint(x, y+1, res)
+        # f_cells.addPoint(x+1,y, res)
+        # f_cells.addPoint(x, y-1, res)
+        # f_cells.addPoint(x-1,y, res)
+        # f_cells.addPoint(x, y+1, res)
+        #neighbor cells are filtered to make sure they are not an obstacle and are on the map 
+        results = [right_cell, bottom_cell, left_cell, top_cell]
+        results = filter(self.in_bounds, results)
+        results = filter(self.passable, results)
+
+        return results
+
+
+class LocalGrid:
+    def __init__(self):
+        self = mapgrid
+
+    def in_bounds(self, point):
+        currentX = point[0]
+        currentY = point[1]
+
+        return abs(currentX) < (localWidth / 2) and abs(currentY) < (localHeight / 2)
+
+    def passable(self, point):  
+
+        tmpX = int(point[0])
+        tmpY = int(point[1])
+
+        index = (localHeight*tmpY) + tmpX
+
+        return localMapData[index] < 50
+
+
+        #return point not in b_cells.a.cells
+
+    def neighbors(self, point):
+        (x, y) = point 
+
+        right_cell = (x+1, y)
+        bottom_cell = (x, y-1)
+        left_cell = (x-1, y)
+        top_cell = (x, y+1)
+
         #neighbor cells are filtered to make sure they are not an obstacle and are on the map 
         results = [right_cell, bottom_cell, left_cell, top_cell]
         results = filter(self.in_bounds, results)
@@ -261,6 +297,11 @@ def driveStraight(speed, distance):
 
 
 def rotate(angle):
+    if(angle > numpy.pi):
+        angle -= (numpy.pi * 2)
+    elif(angle < -1 * numpy.pi):
+        angle += (numpy.pi * 2)
+
     global odom_list
     global pose
 
@@ -335,20 +376,10 @@ def rotate(angle):
 
 def goToWaypoint(goal):
     global pose
-    global robotX
-    global robotY
 
     x0 = robotX
     y0 = robotY
     theta0 = robotTheta
-
-    # #current orientation
-    # quat0 = pose.pose.orientation
-    # q0 = [quat0.x, quat0.y, quat0.z, quat0.w]
-    # roll0, pitch0, yaw0 = tf.transformations.euler_from_quaternion(q0)
-    # x0 = current[0]
-    # y0 = current[1]
-    # theta0 = yaw0
 
     #desired orientation
     quat1 = pose.pose.orientation
@@ -376,15 +407,17 @@ def goToWaypoint(goal):
 
 
 def driveToGoal(waypoints, start, goal):
-    # goToWaypoint(waypoints[0])
     length = len(waypoints)
 
-    for i in range(0, length - 2):
-        goToWaypoint(waypoints[i+2])
+    for i in range(1, length - 1):
+        # print robotX
+        # print robotY
+        # print robotTheta
+        # print "---"
 
-     # goToWaypoint(waypoints[length-1], goal)
+        goToWaypoint(waypoints[i])
 
-    #rotate() to final pose
+    # goToWaypoint(goal)
 
 
 #####============================== Callbacks ==============================#####
@@ -406,8 +439,8 @@ def mapCallBack(data):
 
 
 def readGoal(msg):
-    px = (msg.pose.position.x - .5) / .3
-    py = msg.pose.position.y / .3
+    px = ((msg.pose.position.x - .5) / .3) + 18
+    py = (msg.pose.position.y / .3) + 18
     quat = msg.pose.orientation
     q = [quat.x, quat.y, quat.z, quat.w]
     roll, pitch, yaw = euler_from_quaternion(q)
@@ -425,15 +458,16 @@ def readGoal(msg):
     Waypoints = displayPath(PathToGoal, startPos, goalPos)
     driveToGoal(Waypoints, startPos, goalPos)
 
-    theta = thetaEnd - robotTheta
-    rotate(theta)
+    theta = thetaEnd - robotTheta 
+
+    rotate(theta) #to final pose
 
     print "Lab complete"
 
     
 def startCallBack(data):
-    px = (data.pose.pose.position.x - .5) / .3
-    py = data.pose.pose.position.y / .3
+    px = ((data.pose.pose.position.x - .5) / .3) + 18
+    py = (data.pose.pose.position.y / .3) + 18
     quat = data.pose.pose.orientation
     q = [quat.x, quat.y, quat.z, quat.w]
     roll, pitch, yaw = euler_from_quaternion(q)
@@ -459,11 +493,11 @@ def odomCallback(data):
     geo_quat = pose.pose.orientation
 
     # Broadcast the transformation from the tf frame "base_footprint" to tf frame "odom" 
-    odom_tf.sendTransform((pose.pose.position.x, pose.pose.position.y, 0), 
-                          (pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w), 
-                          rospy.Time.now(), 
-                          "base_footprint", 
-                          "odom")
+    #odom_tf.sendTransform((pose.pose.position.x, pose.pose.position.y, 0), 
+    #                      (pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w), 
+    #                      rospy.Time.now(), 
+    #                      "base_footprint", 
+    #                      "odom")
     
 
 def localCostCallBack(data):
@@ -478,7 +512,6 @@ def localCostCallBack(data):
     localRes = data.info.resolution
 
 
-
 def robotLocationCallBack(data):
     global robotX
     global robotY
@@ -486,15 +519,12 @@ def robotLocationCallBack(data):
 
     odom_list.waitForTransform('map', 'base_footprint', rospy.Time(0), rospy.Duration(1.0))
     (position, orientation) = odom_list.lookupTransform('map', 'base_footprint', rospy.Time(0))
-    robotX = ((position[0] - 0.5) / 0.3)
-    robotY = (position[1] / 0.3)
-
+    robotX = ((position[0] - .5) / .3) + 18
+    robotY = (position[1] / .3) + 18
     odomW = orientation
     q = [odomW[0], odomW[1], odomW[2], odomW[3]]
     roll, pitch, yaw = euler_from_quaternion(q)
     robotTheta = yaw
-
-
 
 
 #####============================== MAIN ==============================#####
@@ -522,7 +552,7 @@ if __name__ == '__main__':
     AMap = 0
     path = 0
 
-    rospy.init_node('lab3')
+    rospy.init_node('lab4')
 
     odom_list = tf.TransformListener()
     odom_tf = tf.TransformBroadcaster()
@@ -545,10 +575,12 @@ if __name__ == '__main__':
 
     twistPub = rospy.Publisher('cmd_vel_mux/input/teleop', Twist ,queue_size=2)
 
-    rospy.Timer(rospy.Duration(0.2), robotLocationCallBack)
 
     rospy.sleep(1)
 
+    rospy.Timer(rospy.Duration(.2), robotLocationCallBack)
+
+    print "Starting"
     
 
     while (1 and not rospy.is_shutdown()):
