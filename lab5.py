@@ -58,11 +58,12 @@ def AStar(start, goal):
 
 def centroidSearch(start):
 	CurrGrid = SquareGrid()
-	frontier = Queue.PriorityQueue()
+	frontier = []
+	midPoint = 0
+	dest = Point()
 	toSearch = Queue()
 	toSearch2 = Queue()
 	done = 0
-	priority = 0
 	numVisited = 0
 	visited1 = Queue()
 	visited2 = Queue()
@@ -87,10 +88,15 @@ def centroidSearch(start):
 				visited2.append(next)
 				#not sure if I can reference mapData like this
 				if (mapData[next] >= 0):
-					frontier.append(next, priority)
-					priority+=1
+					frontier.append(next)
 		if toSearch2.empty():
 			done = 1
+
+	midPoint = len(frontier)
+	dest.x = frontier[midPoint][0]
+	dest.y = frontier[midPoint][1]
+
+	return dest
 
 
 def unexplored(self):
@@ -419,22 +425,18 @@ if __name__ == '__main__':
 		while (not move_done and not rospy.is_shutdown()):
 			pass
 
-	startPos = Pose()
-	goalPos = Pose()
+	startPos = (robotX, robotY)
+	goalPos = (0, 0)
 
     #fill map
 	while (boundaries and not rospy.is_shutdown()):
     	#calculate boundary centroid
+    	startPos = (robotX, robotY)
+
+    	goalPos = Point()
+    	goalPos = centroidSearch(startPos)
 
         #AStar to centroid
-		startPos.pose.position.x = robotX
-		startPos.pose.position.y = robotY
-		startPos.pose.orientation.w = robotTheta
-
-        #search for next goal
-        
-
-        #run AStar
 		PathToGoal = AStar(startPos, goalPos)
 		Waypoints = displayGrid(PathToGoal, startPos, goalPos)
 
