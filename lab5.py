@@ -6,12 +6,12 @@ import roslib
 import time
 import math
 import Queue
-import actionlib_msgs
 from nav_msgs.msg import OccupancyGrid, GridCells, Path, Odometry
 from geometry_msgs.msg import Point, Pose, PoseStamped, Twist, PoseWithCovarianceStamped, Quaternion
 from tf.transformations import euler_from_quaternion
 from std_msgs.msg import String
 from kobuki_msgs.msg import BumperEvent
+from actionlib_msgs.msg import GoalStatusArray
 import tf
 import numpy
 
@@ -131,13 +131,25 @@ def displayPath(path, start, goal):
     length = len(path)
 
     waypoints.append(start)
+    straightCounter = 0
+
 
     while(j + 1 < length):
         if(pathPoints[j][1] == pathPoints[j-1][1] and pathPoints[j][0] == pathPoints[j+1][0]):
             waypoints.append(pathPoints[j])
+            straightCounter = 0
+
 
         elif(pathPoints[j][0] == pathPoints[j-1][0] and pathPoints[j][1] == pathPoints[j+1][1]):
             waypoints.append(pathPoints[j])
+            straightCounter = 0
+
+        else:
+            straightCounter += 1
+
+        if(straightCounter == 20):
+            waypoints.append(pathPoints[j])
+            straightCounter = 0
 
         j += 1
 
@@ -365,7 +377,7 @@ def odomCallBack(data):
 
 def statusCallBack(data):
     global move_done
-    status = data.status_list.goal_id
+    status = data.status_list
     move_done = staus == 3 or staus == 4
 
 
@@ -405,7 +417,7 @@ if __name__ == '__main__':
 
 
 	rospy.Timer(rospy.Duration(2), displayGrid(mapData))
-	rospy.Timer(rospy.Duration(2), robotLocationCallBack)
+	rospy.Timer(rospy.Duration(.2), robotLocationCallBack)
 
 	rospy.sleep(1)
 
