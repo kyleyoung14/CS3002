@@ -337,6 +337,17 @@ def scan():
         pass
 
 
+def goToWaypoint(point):
+    newPose = PoseStamped()
+    newPose.pose.position.x = point[0]
+    newPose.pose.position.y = point[1]
+    newPose.pose.orientation.w = robotTheta 
+    newPose.header.frame_id = "map"
+    newPose.header.stamp = rospy.Time.now()
+
+    move_pub.publish(newPose)
+
+
 #####============================== Callbacks ==============================#####
 
 def mapCallBack(data):
@@ -383,102 +394,106 @@ def odomCallBack(data):
 def statusCallBack(data):
     global move_done
     status = data.status_list
-    move_done = status == 3 or status == 4
+    print status
+    move_done = (status == 3 or status == 4)
 
 
 #####============================== MAIN ==============================#####
 
 if __name__ == '__main__':
 
-	global target
-	global waypoint_pub
-	global frontier_pub
-	global boundary_pub
-	global path_pub
-	global move_pub
-	global pose
-	global odom_tf
-	global odom_list
-	global robotX
-	global robotY
-	global robotTheta
-	global move_done
+    global target
+    global waypoint_pub
+    global frontier_pub
+    global boundary_pub
+    global path_pub
+    global move_pub
+    global pose
+    global odom_tf
+    global odom_list
+    global robotX
+    global robotY
+    global robotTheta
+    global move_done
 
-	robotX = 0
-	robotY = 0
-	robotTheta = 0
+    robotX = 0
+    robotY = 0
+    robotTheta = 0
 
-	rospy.init_node('lab5')
+    rospy.init_node('lab5')
 
-	odom_list = tf.TransformListener()
-	odom_tf = tf.TransformBroadcaster()
-	odom_tf.sendTransform((0, 0, 0),(0, 0, 0, 1),rospy.Time.now(),"base_footprint","odom")
+    odom_list = tf.TransformListener()
+    odom_tf = tf.TransformBroadcaster()
+    odom_tf.sendTransform((0, 0, 0),(0, 0, 0, 1),rospy.Time.now(),"base_footprint","odom")
 
-	worldMapSub = rospy.Subscriber('/map', OccupancyGrid, mapCallBack)
-	odomSub = rospy.Subscriber('/odom', Odometry, odomCallBack)
-	baseStatusSub = rospy.Subscriber("move_base/status", GoalStatusArray, statusCallBack)
+    worldMapSub = rospy.Subscriber('/map', OccupancyGrid, mapCallBack)
+    odomSub = rospy.Subscriber('/odom', Odometry, odomCallBack)
+    baseStatusSub = rospy.Subscriber("move_base/status", GoalStatusArray, statusCallBack)
 
-	waypoint_pub = rospy.Publisher('/waypoints', GridCells, queue_size=1)
-	frontier_pub = rospy.Publisher("/frontier", GridCells, queue_size=1)            
-	boundary_pub = rospy.Publisher("/boundary", GridCells, queue_size=1)
-	path_pub = rospy.Publisher("/pathcells", GridCells, queue_size=1)
-	move_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1)
-	displayGrid(mapData)
+    waypoint_pub = rospy.Publisher('/waypoints', GridCells, queue_size=1)
+    frontier_pub = rospy.Publisher("/frontier", GridCells, queue_size=1)            
+    boundary_pub = rospy.Publisher("/boundary", GridCells, queue_size=1)
+    path_pub = rospy.Publisher("/pathcells", GridCells, queue_size=1)
+    move_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1)
+    displayGrid(mapData)
 
-	rospy.Timer(rospy.Duration(2), displayGrid(mapData))
-	rospy.Timer(rospy.Duration(.2), robotLocationCallBack)
+    rospy.Timer(rospy.Duration(2), displayGrid(mapData))
+    rospy.Timer(rospy.Duration(.2), robotLocationCallBack)
 
-	rospy.sleep(1)
+    rospy.sleep(1)
+    boundaries = True
 
-	boundaries = True
+    #rotate 360
+    # print("Trying to rotate")
+    # rotPose = PoseStamped()
+    # rotPose.pose.position.x = robotX
+    # rotPose.pose.position.y = robotY
+    # rotPose.pose.orientation.w = robotTheta 
+    # rotPose.header.frame_id = "map"
 
-	#rotate 360
-	print("Trying to rotate")
-	rotPose = PoseStamped()
-	rotPose.pose.position.x = robotX
-	rotPose.pose.position.y = robotY
-	rotPose.pose.orientation.w = robotTheta 
-	rotPose.header.frame_id = "map"
+    # for i in range(0,3):
+    # 	rotPose.pose.orientation.w += (numpy.pi / 2)
+    # 	rotPose.header.stamp = rospy.Time.now()
 
-	for i in range(0,3):
-		rotPose.pose.orientation.w += (numpy.pi / 2)
-		rotPose.header.stamp = rospy.Time.now()
+    # 	move_pub.publish(rotPose)
 
-		move_pub.publish(rotPose)
+    # 	while (not move_done and not rospy.is_shutdown()):
+    # 		pass
 
 
-		print("trying still")
-		while (not move_done and not rospy.is_shutdown()):
-			print("stuck in while loop?")
-			pass
+    # print "finished rotating"
+    startPos = (robotX, robotY)
+    goalPos = (0, 0)
 
-	print("finishing rotating")
-	startPos = (robotX, robotY)
-	goalPos = (0, 0)
+    examplePos = (robotX + 2, robotY + 2)
+
+    goToWaypoint(examplePos)
 
     #fill map
-	while (boundaries and not rospy.is_shutdown()):
-    	#calculate boundary centroid
-		startPos = (robotX, robotY)
+	# while (boundaries and not rospy.is_shutdown()):
+ #    	#calculate boundary centroid
+	# 	startPos = (robotX, robotY)
 
-		goalPos = Point()
-		goalPos = centroidSearch(startPos)
+	# 	goalPos = Point()
+	# 	goalPos = centroidSearch(startPos)
 
-		print(goalPos)
+	# 	print(goalPos)
 
-        #AStar to centroid
-		PathToGoal = AStar(startPos, goalPos)
-		Waypoints = displayGrid(PathToGoal, startPos, goalPos)
+ #        #AStar to centroid
+	# 	PathToGoal = AStar(startPos, goalPos)
+	# 	Waypoints = displayGrid(PathToGoal, startPos, goalPos)
 
-        #go to first waypoint
+ #        #go to first waypoint
+ #        goToWaypoint(Waypoints[0])
 
-        #scan
-		scan()
 
-        #update boundary
-        #if(no boundary):
-            #boundaries = False
-		pass
+ #        #scan
+	# 	scan()
+
+ #        #update boundary
+ #        #if(no boundary):
+ #            #boundaries = False
+	# 	pass
         
 
-	print "Lab Complete!"
+    print "Lab Complete!"
