@@ -11,9 +11,7 @@ from geometry_msgs.msg import Point, Pose, PoseStamped, Twist, PoseWithCovarianc
 from tf.transformations import euler_from_quaternion
 from std_msgs.msg import String
 from kobuki_msgs.msg import BumperEvent
-import actionlib
 from actionlib_msgs.msg import GoalStatusArray, GoalStatus, GoalID
-from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 import tf
 import numpy
 
@@ -427,14 +425,12 @@ if __name__ == '__main__':
 	move_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1)
 	displayGrid(mapData)
 
-	#rospy.Timer(rospy.Duration(2), displayGrid(mapData))
-	#rospy.Timer(rospy.Duration(.2), robotLocationCallBack)
+	# rospy.Timer(rospy.Duration(2), displayGrid(mapData))
+	# rospy.Timer(rospy.Duration(.2), robotLocationCallBack)
 
 	rospy.sleep(1)
 
 	boundaries = True
-
-	publishingGoal = actionlib.SimpleActionClient("move_base", MoveBaseAction)
 
 	#rotate 360
 	print("Trying to rotate")
@@ -442,12 +438,13 @@ if __name__ == '__main__':
 	rotPose.pose.position.x = robotX
 	rotPose.pose.position.y = robotY
 	rotPose.pose.orientation.w = robotTheta 
+	rotPose.header.frame_id = "map"
 
 	for i in range(0,3):
 		rotPose.pose.orientation.w += (numpy.pi / 2)
+		rotPose.header.stamp = rospy.Time.now()
 
-		# move_pub.publish(rotPose)
-		publishingGoal.send_goal(rotPose)
+		move_pub.publish(rotPose)
 
 
 		print("trying still")
