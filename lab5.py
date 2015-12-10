@@ -425,8 +425,8 @@ if __name__ == '__main__':
 	move_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1)
 	displayGrid(mapData)
 
-	# rospy.Timer(rospy.Duration(2), displayGrid(mapData))
-	# rospy.Timer(rospy.Duration(.2), robotLocationCallBack)
+	rospy.Timer(rospy.Duration(2), displayGrid(mapData))
+	rospy.Timer(rospy.Duration(.2), robotLocationCallBack)
 
 	rospy.sleep(1)
 
