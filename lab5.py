@@ -11,7 +11,9 @@ from geometry_msgs.msg import Point, Pose, PoseStamped, Twist, PoseWithCovarianc
 from tf.transformations import euler_from_quaternion
 from std_msgs.msg import String
 from kobuki_msgs.msg import BumperEvent
-from actionlib_msgs.msg import GoalStatusArray
+import actionlib
+from actionlib_msgs.msg import GoalStatusArray, GoalStatus, GoalID
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 import tf
 import numpy
 
@@ -61,18 +63,18 @@ def centroidSearch(start):
 	frontier = []
 	midPoint = 0
 	dest = Point()
-	toSearch = Queue()
-	toSearch2 = Queue()
+	toSearch = Queue.Queue()
+	toSearch2 = Queue.Queue()
 	done = 0
 	numVisited = 0
-	visited1 = Queue()
-	visited2 = Queue()
+	visited1 = Queue.Queue()
+	visited2 = Queue.Queue()
 	unknown = Point()
 
 	while not done and not rospy.is_shutdown():
 		for next in CurrGrid.allNeighbors(start):
-			toSearch.append(next)
-			if next.unexplored() == True:
+			toSearch.put(next)
+			if unexplored(next) == True:
 				unknown = next
 				done = 1
 				break
@@ -82,13 +84,13 @@ def centroidSearch(start):
 
 	while not done and not rospy.is_shutdown():
 		for next in CurrGrid.unkNeighbors(unknown):
-			toSearch2.append(next)
-			if next not in visited2 and next.unexplored() == True:
+			toSearch2.put(next)
+			if next not in visited2 and unexplored(next) == True:
 				numVisited += 1
-				visited2.append(next)
+				visited2.put(next)
 				#not sure if I can reference mapData like this
 				if (mapData[next] >= 0):
-					frontier.append(next)
+					frontier.put(next)
 		if toSearch2.empty():
 			done = 1
 
@@ -99,10 +101,15 @@ def centroidSearch(start):
 	return dest
 
 
-def unexplored(self):
+def unexplored(point):
 	global mapData
 
-	if mapData[self] == -1:
+	tmpX = int(point[0])
+	tmpY = int(point[1])
+
+	index = (37*tmpY) + tmpX
+
+	if mapData[index] == -1:
 		return True
 	else:
 		return False
@@ -378,7 +385,7 @@ def odomCallBack(data):
 def statusCallBack(data):
     global move_done
     status = data.status_list
-    move_done = staus == 3 or staus == 4
+    move_done = status == 3 or status == 4
 
 
 #####============================== MAIN ==============================#####
@@ -399,6 +406,10 @@ if __name__ == '__main__':
 	global robotTheta
 	global move_done
 
+	robotX = 0
+	robotY = 0
+	robotTheta = 0
+
 	rospy.init_node('lab5')
 
 	odom_list = tf.TransformListener()
@@ -414,16 +425,19 @@ if __name__ == '__main__':
 	boundary_pub = rospy.Publisher("/boundary", GridCells, queue_size=1)
 	path_pub = rospy.Publisher("/pathcells", GridCells, queue_size=1)
 	move_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1)
+	displayGrid(mapData)
 
-
-	rospy.Timer(rospy.Duration(2), displayGrid(mapData))
-	rospy.Timer(rospy.Duration(.2), robotLocationCallBack)
+	#rospy.Timer(rospy.Duration(2), displayGrid(mapData))
+	#rospy.Timer(rospy.Duration(.2), robotLocationCallBack)
 
 	rospy.sleep(1)
 
 	boundaries = True
 
+	publishingGoal = actionlib.SimpleActionClient("move_base", MoveBaseAction)
+
 	#rotate 360
+	print("Trying to rotate")
 	rotPose = PoseStamped()
 	rotPose.pose.position.x = robotX
 	rotPose.pose.position.y = robotY
@@ -432,21 +446,28 @@ if __name__ == '__main__':
 	for i in range(0,3):
 		rotPose.pose.orientation.w += (numpy.pi / 2)
 
-		move_pub.publish(rotPose)
+		# move_pub.publish(rotPose)
+		publishingGoal.send_goal(rotPose)
 
+
+		print("trying still")
 		while (not move_done and not rospy.is_shutdown()):
+			print("stuck in while loop?")
 			pass
 
+	print("finishing rotating")
 	startPos = (robotX, robotY)
 	goalPos = (0, 0)
 
     #fill map
 	while (boundaries and not rospy.is_shutdown()):
     	#calculate boundary centroid
-    	startPos = (robotX, robotY)
+		startPos = (robotX, robotY)
 
-    	goalPos = Point()
-    	goalPos = centroidSearch(startPos)
+		goalPos = Point()
+		goalPos = centroidSearch(startPos)
+
+		print(goalPos)
 
         #AStar to centroid
 		PathToGoal = AStar(startPos, goalPos)
