@@ -341,6 +341,10 @@ def goToWaypoint(point):
     newPose = PoseStamped()
     newPose.pose.position.x = point[0]
     newPose.pose.position.y = point[1]
+
+    print newPose.pose.position.x
+    print newPose.pose.position.y
+
     newPose.pose.orientation.w = robotTheta 
     newPose.header.frame_id = "map"
     newPose.header.stamp = rospy.Time.now()
@@ -373,8 +377,8 @@ def robotLocationCallBack(data):
 
     odom_list.waitForTransform('map', 'base_footprint', rospy.Time(0), rospy.Duration(1.0))
     (position, orientation) = odom_list.lookupTransform('map', 'base_footprint', rospy.Time(0))
-    robotX = ((position[0] - 0.5) / 0.3)
-    robotY = (position[1] / 0.3)
+    robotX = position[0]
+    robotY = position[1]
     odomW = orientation
     q = [odomW[0], odomW[1], odomW[2], odomW[3]]
     roll, pitch, yaw = euler_from_quaternion(q)
@@ -393,9 +397,72 @@ def odomCallBack(data):
 
 def statusCallBack(data):
     global move_done
-    status = data.status_list
+    status = data.status_list[0].status
     print status
     move_done = (status == 3 or status == 4)
+
+# This function consumes linear and angular velocities
+# and creates a Twist message.  This message is then published.
+def publishTwist(lin_speed, ang_speed):
+    # Retrieve one global variable
+    #   pub - Publisher for Twist messages
+    global pub 
+
+    # Create a Twist message
+    twist_msg = Twist();        
+
+    # Set the linear and angular components of Twist message
+    twist_msg.linear.x = lin_speed  
+    twist_msg.angular.z = ang_speed
+
+    # Publish Twist message
+
+    pub.publish(twist_msg)
+    rospy.loginfo(twist_msg)
+    rospy.sleep(0.1) 
+
+def spinWheels(u1, u2, time):
+
+    wheel_base = 23.0
+    wheel_rad = 3.5
+
+    # Create variable called pub, r, and b
+    # radius is the distance from the ICC and the center point between the two wheels
+    # b is the is the distance between the centers of the two wheels
+
+    # Calculation for the radius of the arc
+    if (u1 == u2):
+        radius = 0.0 # No rotation
+    else:
+        radius = (wheel_base / 2.0) * (u1 + u2) / (u1 - u2)
+
+    # Calculation for the linear and angular velocities
+    lin_speed = (wheel_rad / 2.0 * u1) + (wheel_rad / 2.0 * u2)
+
+    # Speed Restraint
+    if (lin_speed > 1):
+        lin_speed = 1
+
+    ang_speed = (wheel_rad / (2.0 * wheel_base) * u1) - (wheel_rad / (2.0 * wheel_base) * u2)
+    print(ang_speed)
+    # Retrieve the current time in seconds
+    now = rospy.Time.now().secs
+
+    # While the elapsed time has not been reached and not shut down ...
+    while (rospy.Time.now().secs - now <= time and not rospy.is_shutdown()):
+        t = rospy.Time.now().secs - now
+
+        linear = lin_speed
+        angular = ang_speed
+
+        # Publish twist_msg to topic
+        publishTwist(linear, angular)
+        rospy.sleep(0.1)
+
+    # After the required time has passed or has been shut down ...
+    # Publish stop command to topic
+    publishTwist(0, 0)
+    rospy.sleep(0.1)
 
 
 #####============================== MAIN ==============================#####
@@ -415,6 +482,7 @@ if __name__ == '__main__':
     global robotY
     global robotTheta
     global move_done
+    global pub
 
     robotX = 0
     robotY = 0
@@ -435,7 +503,7 @@ if __name__ == '__main__':
     boundary_pub = rospy.Publisher("/boundary", GridCells, queue_size=1)
     path_pub = rospy.Publisher("/pathcells", GridCells, queue_size=1)
     move_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1)
-    displayGrid(mapData)
+    pub = rospy.Publisher('cmd_vel_mux/input/teleop', Twist ,queue_size=2)
 
     rospy.Timer(rospy.Duration(2), displayGrid(mapData))
     rospy.Timer(rospy.Duration(.2), robotLocationCallBack)
@@ -462,12 +530,20 @@ if __name__ == '__main__':
 
 
     # print "finished rotating"
-    startPos = (robotX, robotY)
-    goalPos = (0, 0)
 
-    examplePos = (robotX + 2, robotY + 2)
+    newPose = PoseStamped()
+    newPose.pose.position.x = robotX
+    newPose.pose.position.y = robotY
+    newPose.pose.orientation.w = robotTheta
+    newPose.header.frame_id = "map"
+    newPose.header.stamp = rospy.Time.now()
 
-    goToWaypoint(examplePos)
+    move_pub.publish(newPose)
+
+    spinWheels(5, -5, 5)
+
+
+
 
     #fill map
 	# while (boundaries and not rospy.is_shutdown()):
