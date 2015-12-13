@@ -60,41 +60,63 @@ def centroidSearch(start):
 	CurrGrid = SquareGrid()
 	frontier = []
 	midPoint = 0
+	noMoreFrontiers = 0
 	dest = Point()
 	toSearch = Queue.Queue()
 	toSearch2 = Queue.Queue()
 	done = 0
 	numVisited = 0
-	visited1 = Queue.Queue()
-	visited2 = Queue.Queue()
+	visited = []
 	unknown = Point()
 
-	while not done and not rospy.is_shutdown():
-		for next in CurrGrid.allNeighbors(start):
-			toSearch.put(next)
-			if unexplored(next) == True:
-				unknown = next
+	print "starting main while loop in search"
+	while not noMoreFrontiers and not rospy.is_shutdown():
+		while not done and not rospy.is_shutdown():
+			print "checking cell"
+			for next in CurrGrid.allNeighbors(start):
+				try:
+					visInd = visited.index(next)
+				except ValueError:
+					visInd = -1
+				if(visInd == -1):
+					print "appending to visited"
+					visited.append(start)
+					toSearch.put(next)
+					if unexplored(next) == True:
+						print "found unexplored"
+						unknown = next
+						print unknown
+						done = 1
+						break
+			try:
+				start = toSearch.get(block = False)
+			except Queue.Empty:
+				noMoreFrontiers = 1
+				return null;
+
+
+		done = 0
+
+		while not done and not rospy.is_shutdown():
+			print "checking surrounding neighbors"
+			for next in CurrGrid.unkNeighbors(unknown):
+				toSearch2.put(next)
+				print "putting into toSearch2"
+				if next not in visited and unexplored(next) == True:
+					numVisited += 1
+					print "append to visited"
+					visited.append(next)
+					#not sure if I can reference mapData like this
+					if (mapData[next] >= 0):
+						print "appending to frontier"
+						frontier.append(next)
+			if toSearch2.empty():
+				print "done searching"
 				done = 1
-				break
-		start = toSearch.get()
+				noMoreFrontiers = 1
 
-	done = 0
-
-	while not done and not rospy.is_shutdown():
-		for next in CurrGrid.unkNeighbors(unknown):
-			toSearch2.put(next)
-			if next not in visited2 and unexplored(next) == True:
-				numVisited += 1
-				visited2.put(next)
-				#not sure if I can reference mapData like this
-				if (mapData[next] >= 0):
-					frontier.put(next)
-		if toSearch2.empty():
-			done = 1
-
-	midPoint = len(frontier)
-	dest.x = frontier[midPoint][0]
-	dest.y = frontier[midPoint][1]
+	midPoint = math.floor(len(frontier)/2) + 1 #returning float, but needs to be an int for index
+	dest = frontier[midPoint]
 
 	return dest
 
@@ -203,6 +225,7 @@ class SquareGrid:
 
         return 100 != mapData[index]
 
+
     def notPassable(self, point):
     	tmpX = int(point[0])
         tmpY = int(point[1])
@@ -234,6 +257,7 @@ class SquareGrid:
 
         return results
 
+
     def allNeighbors(self, point):
         global flag
 
@@ -243,13 +267,21 @@ class SquareGrid:
         bottom_cell = (x, y-1)
         left_cell = (x-1, y)
         top_cell = (x, y+1)
+        top_left_cell = (x-1,y+1)
+        top_right_cell = (x+1,y+1)
+        bottom_right_cell = (x+1,y-1)
+        bottom_left_cell = (x-1,y-1)
         #add neighbor cells to frontier list
         f_cells.addPoint(x+1,y, res)
         f_cells.addPoint(x, y-1, res)
         f_cells.addPoint(x-1,y, res)
         f_cells.addPoint(x, y+1, res)
+        f_cells.addPoint(x-1, y+1, res)
+        f_cells.addPoint(x+1, y+1, res)
+        f_cells.addPoint(x+1, y-1, res)
+        f_cells.addPoint(x-1, y-1, res)
         #neighbor cells are filtered to make sure they are not an obstacle and are on the map 
-        results = [right_cell, bottom_cell, left_cell, top_cell]
+        results = [right_cell, bottom_cell, left_cell, top_cell, top_left_cell, top_right_cell, bottom_right_cell, bottom_left_cell]
         results = filter(self.in_bounds, results)
 
         return results
@@ -263,13 +295,21 @@ class SquareGrid:
         bottom_cell = (x, y-1)
         left_cell = (x-1, y)
         top_cell = (x, y+1)
+        top_left_cell = (x-1,y+1)
+        top_right_cell = (x+1,y+1)
+        bottom_right_cell = (x+1,y-1)
+        bottom_left_cell = (x-1,y-1)
         #add neighbor cells to frontier list
         f_cells.addPoint(x+1,y, res)
         f_cells.addPoint(x, y-1, res)
         f_cells.addPoint(x-1,y, res)
         f_cells.addPoint(x, y+1, res)
+        f_cells.addPoint(x-1, y+1, res)
+        f_cells.addPoint(x+1, y+1, res)
+        f_cells.addPoint(x+1, y-1, res)
+        f_cells.addPoint(x-1, y-1, res)
         #neighbor cells are filtered to make sure they are not an obstacle and are on the map 
-        results = [right_cell, bottom_cell, left_cell, top_cell]
+        results = [right_cell, bottom_cell, left_cell, top_cell, top_left_cell, top_right_cell, bottom_right_cell, bottom_left_cell]
         results = filter(self.in_bounds, results)
         results = filter(self.notPassable, results)
 
@@ -289,34 +329,52 @@ class newCell:
 
     def addPoint(self, x, y,res):
         point = Point()
-        point.x = (x*res) + .65
-        point.y = (y*res) + .15
+        point.x = (x*res) + origin.x + .025
+        point.y = (y*res) + origin.y + .025
         point.z=0
         self.a.cells.append(point)
 
 
-def displayGrid(grid):
+def displayGrid():
     global frontier_pub
     global boundary_pub
     global b_cells
     global f_cells
     global w_cells
     global p_cells
+    global height
+    global width
 
     b_cells = newCell(res)
     f_cells = newCell(res)
     w_cells = newCell(res)
     p_cells = newCell(res)
+
+    CurrGrid = SquareGrid()
         
     cell = 0    
     for y in range(0,height):
         for x in range (0,width):        
-            if (mapData[cell] == 100):
+            if (mapData[cell] >= 80):
                 b_cells.addPoint(x,y,res)
+            
+            if (mapData[cell] == -1):
+                if(mapData[(cell-1)] >= 0 and mapData[(cell-1)] < 80):
+				    f_cells.addPoint(x,y,res)  
+                if(mapData[(cell-width)] >= 0 and mapData[(cell-width)] < 80):
+				    f_cells.addPoint(x,y,res)
+                if((cell+1) < ((width-1) * (height-1))):
+                    if(mapData[(cell+1)] >= 0 and mapData[(cell+1)] < 80):
+				        f_cells.addPoint(x,y,res)
+                    if(mapData[(cell+width)] >= 0 and mapData[(cell+width)] < 80):
+				        f_cells.addPoint(x,y,res)
+
+
             cell += 1
 
     #Results are published
     boundary_pub.publish(b_cells.a)
+    frontier_pub.publish(f_cells.a)
 
 
 #####============================== Movement ==============================#####
@@ -351,17 +409,30 @@ def goToWaypoint(point):
 
     move_pub.publish(newPose)
 
+    # This function consumes linear and angular velocities
+# and creates a Twist message.  This message is then published.
+def publishTwist(lin_speed, ang_speed):
+    # Retrieve one global variable
+    #   pub - Publisher for Twist messages
+    global pub 
+
+    # Create a Twist message
+    twist_msg = Twist();        
+
+    # Set the linear and angular components of Twist message
+    twist_msg.linear.x = lin_speed  
+    twist_msg.angular.z = ang_speed
+
+    # Publish Twist message
+
+    pub.publish(twist_msg)
+    rospy.loginfo(twist_msg)
+    rospy.sleep(0.1) 
 
 def spinWheels(u1, u2, time):
-    global twist_pub
 
     wheel_base = 23.0
     wheel_rad = 3.5
-
-    twist_msg = Twist()
-    stop_msg = Twist()
-    stop_msg.linear.x = 0
-    stop_msg.angular.z = 0
 
     # Create variable called pub, r, and b
     # radius is the distance from the ICC and the center point between the two wheels
@@ -389,22 +460,23 @@ def spinWheels(u1, u2, time):
     while (rospy.Time.now().secs - now <= time and not rospy.is_shutdown()):
         t = rospy.Time.now().secs - now
 
-        twist_msg.linear.x = lin_speed
-        twist_msg.angular.z = ang_speed
+        linear = lin_speed
+        angular = ang_speed
 
         # Publish twist_msg to topic
-        pub.publish(twist_msg)
+        publishTwist(linear, angular)
         rospy.sleep(0.1)
 
     # After the required time has passed or has been shut down ...
     # Publish stop command to topic
-    pub.publish(stop_msg)
+    publishTwist(0, 0)
     rospy.sleep(0.1)
 
 
 #####============================== Callbacks ==============================#####
 
 def mapCallBack(data):
+    print "In Map Callback"
     global mapData
     global grid
     global width
@@ -447,116 +519,105 @@ def odomCallBack(data):
 
 def statusCallBack(data):
     global move_done
-    status = data.status_list[0].status
-    print status
-    move_done = (status == 3 or status == 4)
+    if (data.status_list):
+    	status = data.status_list[0].status
+    	print status
+    	move_done = (status == 3 or status == 4)
+
+
 
 
 #####============================== MAIN ==============================#####
 
 if __name__ == '__main__':
 
-    global target
-    global waypoint_pub
-    global frontier_pub
-    global boundary_pub
-    global path_pub
-    global move_pub
-    global twist_pub
-    global pose
-    global odom_tf
-    global odom_list
-    global robotX
-    global robotY
-    global robotTheta
-    global move_done
+	global target
+	global waypoint_pub
+	global frontier_pub
+	global boundary_pub
+	global path_pub
+	global move_pub
+	global pose
+	global odom_tf
+	global odom_list
+	global robotX
+	global robotY
+	global robotTheta
+	global move_done
+	global pub
 
-    robotX = 0
-    robotY = 0
-    robotTheta = 0
+	robotX = 0
+	robotY = 0
+	robotTheta = 0
 
-    rospy.init_node('lab5')
+	rospy.init_node('lab5')
 
-    odom_list = tf.TransformListener()
-    odom_tf = tf.TransformBroadcaster()
-    odom_tf.sendTransform((0, 0, 0),(0, 0, 0, 1),rospy.Time.now(),"base_footprint","odom")
+	odom_list = tf.TransformListener()
+	odom_tf = tf.TransformBroadcaster()
+	odom_tf.sendTransform((0, 0, 0),(0, 0, 0, 1),rospy.Time.now(),"base_footprint","odom")
 
-    worldMapSub = rospy.Subscriber('/map', OccupancyGrid, mapCallBack)
-    odomSub = rospy.Subscriber('/odom', Odometry, odomCallBack)
-    baseStatusSub = rospy.Subscriber("move_base/status", GoalStatusArray, statusCallBack)
+	worldMapSub = rospy.Subscriber('/map', OccupancyGrid, mapCallBack)
+	odomSub = rospy.Subscriber('/odom', Odometry, odomCallBack)
+	baseStatusSub = rospy.Subscriber("move_base/status", GoalStatusArray, statusCallBack)
 
-    waypoint_pub = rospy.Publisher('/waypoints', GridCells, queue_size=1)
-    frontier_pub = rospy.Publisher("/frontier", GridCells, queue_size=1)            
-    boundary_pub = rospy.Publisher("/boundary", GridCells, queue_size=1)
-    path_pub = rospy.Publisher("/pathcells", GridCells, queue_size=1)
-    move_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1)
-    twist_pub = rospy.Publisher('cmd_vel_mux/input/teleop', Twist ,queue_size=2)
+	waypoint_pub = rospy.Publisher('/waypoints', GridCells, queue_size=1)
+	frontier_pub = rospy.Publisher("/frontier", GridCells, queue_size=1)            
+	boundary_pub = rospy.Publisher("/boundary", GridCells, queue_size=1)
+	path_pub = rospy.Publisher("/pathcells", GridCells, queue_size=1)
+	move_pub = rospy.Publisher("/move_base_simple/goal", PoseStamped, queue_size=1)
+	pub = rospy.Publisher('cmd_vel_mux/input/teleop', Twist ,queue_size=2)
 
-    rospy.Timer(rospy.Duration(2), displayGrid(mapData))
-    rospy.Timer(rospy.Duration(.2), robotLocationCallBack)
+	rospy.sleep(1)
 
-    rospy.sleep(1)
-    boundaries = True
+	rospy.Timer(rospy.Duration(2), displayGrid())
+	#rospy.Timer(rospy.Duration(.2), robotLocationCallBack)
 
-    #rotate 360
-    # print("Trying to rotate")
-    # rotPose = PoseStamped()
-    # rotPose.pose.position.x = robotX
-    # rotPose.pose.position.y = robotY
-    # rotPose.pose.orientation.w = robotTheta 
-    # rotPose.header.frame_id = "map"
+	boundaries = True
 
-    # for i in range(0,3):
-    # 	rotPose.pose.orientation.w += (numpy.pi / 2)
-    # 	rotPose.header.stamp = rospy.Time.now()
+	#rotate 360
+	spinWheels(5, -5, 11)
+	spinWheels(5, -5, 11)
+	rospy.sleep(15)
 
-    # 	move_pub.publish(rotPose)
+	print "finished rotating"
 
-    # 	while (not move_done and not rospy.is_shutdown()):
-    # 		pass
+	newPose = PoseStamped()
+	newPose.pose.position.x = robotX
+	newPose.pose.position.y = robotY
+	newPose.pose.orientation.w = robotTheta
+	newPose.header.frame_id = "map"
+	newPose.header.stamp = rospy.Time.now()
 
-
-    # print "finished rotating"
-
-    newPose = PoseStamped()
-    newPose.pose.position.x = robotX
-    newPose.pose.position.y = robotY
-    newPose.pose.orientation.w = robotTheta
-    newPose.header.frame_id = "map"
-    newPose.header.stamp = rospy.Time.now()
-
-    move_pub.publish(newPose)
-
-    spinWheels(5, -5, 5)
+	move_pub.publish(newPose)
 
 
+    # fill map
+	while (boundaries and not rospy.is_shutdown()):
+    	#calculate boundary centroid
+		startPos = (robotX, robotY)
+
+		goalPos = Point()
+		goalPos = centroidSearch(startPos)
+		if(goalPos == null):
+			print "Done with centroid search"
+
+		print(goalPos)
+
+        #AStar to centroid
+		PathToGoal = AStar(startPos, goalPos)
+		Waypoints = displayGrid(PathToGoal, startPos, goalPos)
+
+        #go to first waypoint
+		goToWaypoint(Waypoints[0])
 
 
-    #fill map
-	# while (boundaries and not rospy.is_shutdown()):
- #    	#calculate boundary centroid
-	# 	startPos = (robotX, robotY)
+        #scan
+		scan()
 
-	# 	goalPos = Point()
-	# 	goalPos = centroidSearch(startPos)
-
-	# 	print(goalPos)
-
- #        #AStar to centroid
-	# 	PathToGoal = AStar(startPos, goalPos)
-	# 	Waypoints = displayGrid(PathToGoal, startPos, goalPos)
-
- #        #go to first waypoint
- #        goToWaypoint(Waypoints[0])
-
-
- #        #scan
-	# 	scan()
-
- #        #update boundary
- #        #if(no boundary):
- #            #boundaries = False
+        #update boundary
+        #if(no boundary):
+            #boundaries = False
 	# 	pass
         
 
-    print "Lab Complete!"
+	print "Lab Complete!"
