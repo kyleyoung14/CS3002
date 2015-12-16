@@ -55,112 +55,233 @@ def AStar(start, goal):
     #print came_from
     return came_from
 
-
-def centroidSearch(start):
+def centroidSearch2():
     global f_cells
+    global noFrontiers
 
-    CurrGrid = SquareGrid()
+    cells = newCell(res)
+    cells = f_cells
+
+    allFrontiers = []
     frontier = []
-    midPoint = 0
-    noMoreFrontiers = False
-    dest = Point()
-    toSearch = Queue.Queue()
-    toSearch2 = Queue.Queue()
-    done = False
-    visited = []
-    unknown = []
-    cellsAdded = 0
-    done = 0
+    newfrontier = Queue.Queue()
+    distances = []
+    sortedFrontiers = []
+    goalPos = []
 
-    print "look for first frontier"
-    while (not done and not rospy.is_shutdown()):
-       # print "checking cell"
-        for next in CurrGrid.allNeighbors(start):
-            if(not inList(visited,next)):
-               # print "adding to visited"
-                visited.append(next)
-		#print visited
-                toSearch.put(next)
-               # print next
+    averageX = 0
+    averageY = 0
+    noFrontiers = 0
 
-                startPoint = Point()
-                startPoint.x = (next[0]*res) + origin.x #+ .025
-                startPoint.y = (next[1]*res) + origin.y #+ .025
-                startPoint.z=0
+    goal = Point()
+    centroid = Point()
+    n = Point()
+    m = Point()
 
-		print startPoint
-                if (f_cells.inNewCell(startPoint)):
-                    print "first boundary found"
-                    done = True
-                    unknown[0] = startPoint.x
-                    unknown[1] = startPoint.y
-                    print unknown
-            else:
-                pass
-               # print "not adding to visited"
-        # start = next
-        try:
-            start = toSearch.get(block = False)
-           # nextCell = toSearch.get(block = False)
-           # start[0] = nextCell.x
-           # start[1] = nextCell.y
-        except Queue.Empty:
-            print "Done with centroidsearch"
-            return
+    print "length of f_cells.a.cells is"
+    print len(f_cells.a.cells)
+    print "length of frontier list is"
+    print len(cells.a.cells)
 
+    #sort f_cells 
+    print "about to sort f_cells"
+    while(cells.a.cells and not rospy.is_shutdown()):
+	print "length of frontier list is"
+	print len(cells.a.cells)
+        # get start of new frontier
+        n = cells.a.cells[0]
+        frontier.append(n)
 
-    done = False
+        #find cells next to the starting cell
+        for next in cells.a.cells:
+            if (next.x <= n.x+1 and next.x >= n.x-1) and (next.y <= n.y+1 and next.y >= n.y-1):
+                print(next)
+                newfrontier.put(next)
+                frontier.append(next)
+                cells.a.cells.remove(next)
 
-    #search the entire boundary
-    while (not done and not rospy.is_shutdown()):
-        print "searching along boundary"
-
-        for next in CurrGrid.unkNeighbors(unknown):
-            if(not inList(visited,next) and unexplored(next)):
-               # print "adding to visited"
-                visited.append(next)
-                toSearch2.put(next)
-
-                nextPoint = Point()
-                nextPoint.x = (next[0]*res) + origin.x + .025
-                nextPoint.y = (next[1]*res) + origin.y + .025
-                nextPoint.z=0
-
-                if (nextPoint in f_cells):
-                    print nextPoint
-                    cellsAdded += 1
+        #find remaining cells next to the current ones in frontier
+        while(newfrontier.qsize() > 0 and not rospy.is_shutdown()):
+            m = newfrontier.get()
+            for next in cells.a.cells:
+                if(next.x <= m.x+1 and next.x >= m.x-1) and (next.y <= m.y+1 and next.y >= m.y-1):
+                    print(next)
+                    newfrontier.put(next)
                     frontier.append(next)
+                    cells.a.cells.remove(next)
+                else:
+                    print newfrontier.qsize()
 
-        # if (cellsAdded == 0):
-        #     done = True
+        #add frontier to list of frontiers
+        allFrontiers.append(frontier)
+        print "added a Frontier"
 
-        # cellsAdded = 0
+    
+    #evaluate frontiers based on centroid's distance from robot
+    print "about to calculate centroids"
+    for i in range(len(allFrontiers)):
+        averageX = 0
+        averageY = 0
 
-        try:
-            unknown = toSearch2.get(block = False)
-           # nextCell = toSearch2.get(block = False)
-           # unknown[0] = nextCell.x
-           # unknown[1] = nextCell.y
-        except Queue.empty:
-            done = True
+        for next in allFrontiers[i]:
+            averageX += next.x
+            averageY += next.y
+
+        averageX /= len(allFrontiers[i])
+        averageY /= len(allFrontiers[i])
+
+        centroid.x = averageX
+        centroid.y = averageY
+
+        dist = ((centroid.x - robotX)**2 + (centroid.y - robotY)**2)**0.5
+
+        #make list of indeces. used to remove largest distance centroid from list later
+        dist = int(dist*10000)
+        print dist
+        distances.append(dist)
+        sortedFrontiers.append(centroid) 
+        print "added a centroid"
 
 
-	# midPoint = int(len(frontier)/2)
-	# print midPoint
-	# dest = frontier[midPoint]
+    #attempt to go to first frontier centroid
+    numLeftOfFrontiers = len(distances)
+    while(not rospy.is_shutdown()):
+        maxDist = max(distances)
+        indexOfMax = distances.index(maxDist)
+        
+        #remove in case this is not passable and needs to find next highest distance
+        distances.remove(maxDist)
 
- #    return dest
+        goal = sortedFrontiers[indexOfMax]
 
-    average = Point()
+        #remove so that the indeces are not out of sync with distances list
+        sortedFrontiers.remove(goal)
+        goalPos = (goal.x, goal.y)
+        #goalPos[0] = goal.x
+        #goalPos[1] = goal.y
 
-    for next in frontier:
-        average.x += next.x
-        average.y += next.y
+        if(passable(goalPos)):
+            print goalPos
+            goToWaypoint(goalPos)
+            break
 
-    average.x /= len(frontier)
-    average.y /= len(frontier)
+        numLeftOfFrontiers -= 1
 
-    return average
+        if(numLeftOfFrontiers == 0):
+            noFrontiers = 1
+            break
+
+    if(noFrontiers == 1):
+       # print "Lab complete"
+        return
+
+
+
+# def centroidSearch(start):
+#     global f_cells
+
+#     CurrGrid = SquareGrid()
+#     frontier = []
+#     midPoint = 0
+#     noMoreFrontiers = False
+#     dest = Point()
+#     toSearch = Queue.Queue()
+#     toSearch2 = Queue.Queue()
+#     done = False
+#     visited = []
+#     unknown = []
+#     cellsAdded = 0
+#     done = 0
+
+#     print "look for first frontier"
+#     while (not done and not rospy.is_shutdown()):
+#        # print "checking cell"
+#         for next in CurrGrid.allNeighbors(start):
+#             if(not inList(visited,next)):
+#                # print "adding to visited"
+#                 visited.append(next)
+#         #print visited
+#                 toSearch.put(next)
+#                # print next
+
+#                 startPoint = Point()
+#                 startPoint.x = (next[0]*res) + origin.x #+ .025
+#                 startPoint.y = (next[1]*res) + origin.y #+ .025
+#                 startPoint.z=0
+
+#         print startPoint
+#                 if (f_cells.inNewCell(startPoint)):
+#                     print "first boundary found"
+#                     done = True
+#                     unknown[0] = startPoint.x
+#                     unknown[1] = startPoint.y
+#                     print unknown
+#             else:
+#                 pass
+#                # print "not adding to visited"
+#         # start = next
+#         try:
+#             start = toSearch.get(block = False)
+#            # nextCell = toSearch.get(block = False)
+#            # start[0] = nextCell.x
+#            # start[1] = nextCell.y
+#         except Queue.Empty:
+#             print "Done with centroidsearch"
+#             return
+
+
+#     done = False
+
+#     #search the entire boundary
+#     while (not done and not rospy.is_shutdown()):
+#         print "searching along boundary"
+
+#         for next in CurrGrid.unkNeighbors(unknown):
+#             if(not inList(visited,next) and unexplored(next)):
+#                # print "adding to visited"
+#                 visited.append(next)
+#                 toSearch2.put(next)
+
+#                 nextPoint = Point()
+#                 nextPoint.x = (next[0]*res) + origin.x + .025
+#                 nextPoint.y = (next[1]*res) + origin.y + .025
+#                 nextPoint.z=0
+
+#                 if (nextPoint in f_cells):
+#                     print nextPoint
+#                     cellsAdded += 1
+#                     frontier.append(next)
+
+#         # if (cellsAdded == 0):
+#         #     done = True
+
+#         # cellsAdded = 0
+
+#         try:
+#             unknown = toSearch2.get(block = False)
+#            # nextCell = toSearch2.get(block = False)
+#            # unknown[0] = nextCell.x
+#            # unknown[1] = nextCell.y
+#         except Queue.empty:
+#             done = True
+
+
+#     # midPoint = int(len(frontier)/2)
+#     # print midPoint
+#     # dest = frontier[midPoint]
+
+#  #    return dest
+
+#     average = Point()
+
+#     for next in frontier:
+#         average.x += next.x
+#         average.y += next.y
+
+#     average.x /= len(frontier)
+#     average.y /= len(frontier)
+
+#     return average
 
 def inList(list, point):
     for next in list:
@@ -171,17 +292,17 @@ def inList(list, point):
 
 
 def unexplored(point):
-	global mapData
+    global mapData
 
-	tmpX = int(point[0])
-	tmpY = int(point[1])
+    tmpX = int(point[0])
+    tmpY = int(point[1])
 
-	index = (width*tmpY) + tmpX
+    index = (width*tmpY) + tmpX
 
-	if mapData[index] == -1:
-		return True
-	else:
-		return False
+    if mapData[index] == -1:
+        return True
+    else:
+        return False
 
 
 def heuristic(a, b):
@@ -256,6 +377,15 @@ def displayPath(path, start, goal):
 
 #####============================== Grid ==============================#####
 
+def passable(point):  
+
+        tmpX = int(point[0])
+        tmpY = int(point[1])
+
+        index = (height*tmpY) + tmpX
+
+        return 100 != mapData[index]
+
 class SquareGrid: 
     def __init__(self):
         self = mapgrid
@@ -265,18 +395,9 @@ class SquareGrid:
         currentY = point[1]
         return currentX < width and currentY < height
 
-    def passable(self, point):  
-
-        tmpX = int(point[0])
-        tmpY = int(point[1])
-
-        index = (height*tmpY) + tmpX
-
-        return 100 != mapData[index]
-
 
     def unknown(self, point):
-    	tmpX = int(point[0])
+        tmpX = int(point[0])
         tmpY = int(point[1])
 
         index = (height*tmpY) + tmpX
@@ -321,7 +442,7 @@ class SquareGrid:
         results = [right_cell, bottom_cell, left_cell, top_cell, top_left_cell, top_right_cell, bottom_right_cell, bottom_left_cell]
         
         results = filter(self.in_bounds, results)
-	
+    
         return results
 
     def unkNeighbors(self, point):
@@ -355,11 +476,10 @@ class newCell:
         self.a.cells = []           
         
     def inNewCell(self, comp):
-	for next in self.a.cells:
+        for next in self.a.cells:
             if (comp.x > next.x-.025 and comp.x < next.x+.025) and (comp.y > next.y-.025 and comp.y < next.y+.025):
                 return True
         return False
-
 
     def get_Size(self):
         return self.a.cell_width
@@ -397,19 +517,18 @@ def displayGrid(data):
             
             if (mapData[cell] == -1):
                 if(mapData[(cell-1)] >= 0 and mapData[(cell-1)] < 80):
-				    f_cells.addPoint(x,y,res)  
+                    f_cells.addPoint(x,y,res)  
                 if(mapData[(cell-width)] >= 0 and mapData[(cell-width)] < 80):
-				    f_cells.addPoint(x,y,res)
+                    f_cells.addPoint(x,y,res)
                 if((cell+1) < ((width-1) * (height-1))):
                     if(mapData[(cell+1)] >= 0 and mapData[(cell+1)] < 80):
-				        f_cells.addPoint(x,y,res)
+                        f_cells.addPoint(x,y,res)
                     if(mapData[(cell+width)] >= 0 and mapData[(cell+width)] < 80):
-				        f_cells.addPoint(x,y,res)
+                        f_cells.addPoint(x,y,res)
 
 
             cell += 1
-    print "f_cells"
-    print f_cells.a.cells
+   
     #Results are published
     boundary_pub.publish(b_cells.a)
     frontier_pub.publish(f_cells.a)
@@ -451,7 +570,8 @@ def goToWaypoint(point):
     move_done = False
 
     while(not move_done and not rospy.is_shutdown()):
-        print "Moving..."
+       # print "Moving..."
+        pass
 
     
 def publishTwist(lin_speed, ang_speed):
@@ -584,7 +704,9 @@ if __name__ == '__main__':
     global robotTheta
     global move_done
     global pub
+    global noFrontiers
 
+    noFrontiers = 0
     robotX = 0
     robotY = 0
     robotTheta = 0
@@ -616,42 +738,45 @@ if __name__ == '__main__':
     boundaries = True
 
     #rotate 360
-   # goToWaypoint(((robotX + .3), robotY))
-   # rospy.sleep(.5)
-   # goToWaypoint(((robotX - .3), robotY))
+    goToWaypoint(((robotX + .3), robotY))
+    rospy.sleep(.5)
+    goToWaypoint(((robotX - .3), robotY))
+    data = []
+    displayGrid(data)
 
 
     print "finished rotating"
-
-
+    rospy.sleep(3)
+    while(not rospy.is_shutdown()):
+        centroidSearch2()
 
     #fill map
     #while (boundaries and not rospy.is_shutdown()):
         #print "starting main while loop in search"
  #  #calculate boundary centroid
-    startPos = (robotX, robotY)
-    goalPos = Point()
-    goalPos = centroidSearch(startPos)
+    # startPos = (robotX, robotY)
+    # goalPos = Point()
+    # goalPos = centroidSearch(startPos)
 
-    print(goalPos)
+    # print(goalPos)
 
-	#boundaries = False
+    #boundaries = False
 
  #        #AStar to centroid
-	# 	PathToGoal = AStar(startPos, goalPos)
-	# 	Waypoints = displayGrid(PathToGoal, startPos, goalPos)
+    #   PathToGoal = AStar(startPos, goalPos)
+    #   Waypoints = displayGrid(PathToGoal, startPos, goalPos)
 
  #        #go to first waypoint
  #        goToWaypoint(Waypoints[0])
 
 
  #        #scan
-	# 	scan()
+    #   scan()
 
  #        #update boundary
  #        #if(no boundary):
  #            #boundaries = False
-	# 	pass
+    #   pass
         
 
     print "Lab Complete!"
