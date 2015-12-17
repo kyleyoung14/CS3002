@@ -72,6 +72,7 @@ def centroidSearch2():
     averageX = 0
     averageY = 0
     noFrontiers = 0
+    cellWH = 1
 
     goal = Point()
     centroid = Point()
@@ -82,19 +83,23 @@ def centroidSearch2():
     print len(f_cells.a.cells)
     print "length of frontier list is"
     print len(cells.a.cells)
+    if len(cells.a.cells) == 0:
+        noFrontiers = 1
+        return
 
     #sort f_cells 
     print "about to sort f_cells"
     while(cells.a.cells and not rospy.is_shutdown()):
-	print "length of frontier list is"
-	print len(cells.a.cells)
+	#print "length of frontier list is"
+	#print len(cells.a.cells)
         # get start of new frontier
+        frontier = []
         n = cells.a.cells[0]
         frontier.append(n)
 
         #find cells next to the starting cell
         for next in cells.a.cells:
-            if (next.x <= n.x+1 and next.x >= n.x-1) and (next.y <= n.y+1 and next.y >= n.y-1):
+            if (next.x <= n.x+cellWH and next.x >= n.x-cellWH) and (next.y <= n.y+cellWH and next.y >= n.y-cellWH):
                 print(next)
                 newfrontier.put(next)
                 frontier.append(next)
@@ -104,25 +109,36 @@ def centroidSearch2():
         while(newfrontier.qsize() > 0 and not rospy.is_shutdown()):
             m = newfrontier.get()
             for next in cells.a.cells:
-                if(next.x <= m.x+1 and next.x >= m.x-1) and (next.y <= m.y+1 and next.y >= m.y-1):
-                    print(next)
+                if(next.x <= m.x+cellWH and next.x >= m.x-cellWH) and (next.y <= m.y+cellWH and next.y >= m.y-cellWH):
+                    #print(next)
                     newfrontier.put(next)
                     frontier.append(next)
                     cells.a.cells.remove(next)
                 else:
-                    print newfrontier.qsize()
+                    #print newfrontier.qsize()
+                    pass
 
-        #add frontier to list of frontiers
-        allFrontiers.append(frontier)
-        print "added a Frontier"
-
+        #add frontier to list of frontiers if large enough
+        if len(frontier) > 4:
+            allFrontiers.append(frontier)
+            #print "added a Frontier"
+        else:
+            print "frontier too small"
     
     #evaluate frontiers based on centroid's distance from robot
+    length = []
+    for next in allFrontiers:
+        temp = len(next)
+        length.append(temp)
+
+    print length
+
     print "about to calculate centroids"
-    for i in range(len(allFrontiers)):
+    for i in xrange(0,len(allFrontiers)):
         averageX = 0
         averageY = 0
-
+        #print "number of cells in frontier"
+        #print len(allFrontiers[i])
         for next in allFrontiers[i]:
             averageX += next.x
             averageY += next.y
@@ -132,11 +148,41 @@ def centroidSearch2():
 
         centroid.x = averageX
         centroid.y = averageY
-
+        #print "centroid values"
+        #print centroid
+        CurrGrid = SquareGrid()
+        cent = []
+        cent.append(centroid.x)
+        cent.append(centroid.y)
+       # if(unexplored(cent)):
+       #     done = 0
+       #     toSearch = Queue.Queue()
+       #     visited = []
+       #     visited.append(cent)
+       #     while (not done and not rospy.is_shutdown()):
+       #         for next in CurrGrid.allNeighbors(cent):
+       #             if(not inList(visited,next)):    
+       #                 visited.append(next)
+       #                 toSearch.put(next)
+       #                 if not unexplored(next):
+       #                     centroid.x = next[0]
+       #                     centroid.y = next[1]
+       #                     dist = ((centroid.x - robotX)**2 + (centroid.y - robotY)**2)**0.5
+       #                     done = 1
+       #                     break
+       #             else:
+       #                 try:
+       #                     cent = toSearch.get()
+       #                 except Query.Empty:
+       #                     print "no way to get to frontier"
+       #                     dist = 0
+       # else:
         dist = ((centroid.x - robotX)**2 + (centroid.y - robotY)**2)**0.5
 
         #make list of indeces. used to remove largest distance centroid from list later
-        dist = int(dist*10000)
+        print "distance values"
+        print dist
+        dist = int(dist*1000000)
         print dist
         distances.append(dist)
         sortedFrontiers.append(centroid) 
@@ -384,7 +430,7 @@ def passable(point):
 
         index = (height*tmpY) + tmpX
 
-        return 100 != mapData[index]
+        return 70 >= mapData[index]
 
 class SquareGrid: 
     def __init__(self):
@@ -512,18 +558,18 @@ def displayGrid(data):
     cell = 0    
     for y in range(0,height):
         for x in range (0,width):        
-            if (mapData[cell] >= 80):
+            if (mapData[cell] >= 70):
                 b_cells.addPoint(x,y,res)
             
             if (mapData[cell] == -1):
-                if(mapData[(cell-1)] >= 0 and mapData[(cell-1)] < 80):
+                if(mapData[(cell-1)] >= 0 and mapData[(cell-1)] < 70):
                     f_cells.addPoint(x,y,res)  
-                if(mapData[(cell-width)] >= 0 and mapData[(cell-width)] < 80):
+                if(mapData[(cell-width)] >= 0 and mapData[(cell-width)] < 70):
                     f_cells.addPoint(x,y,res)
                 if((cell+1) < ((width-1) * (height-1))):
-                    if(mapData[(cell+1)] >= 0 and mapData[(cell+1)] < 80):
+                    if(mapData[(cell+1)] >= 0 and mapData[(cell+1)] < 70):
                         f_cells.addPoint(x,y,res)
-                    if(mapData[(cell+width)] >= 0 and mapData[(cell+width)] < 80):
+                    if(mapData[(cell+width)] >= 0 and mapData[(cell+width)] < 70):
                         f_cells.addPoint(x,y,res)
 
 
@@ -718,6 +764,7 @@ if __name__ == '__main__':
     odom_tf.sendTransform((0, 0, 0),(0, 0, 0, 1),rospy.Time.now(),"base_footprint","odom")
 
     worldMapSub = rospy.Subscriber('/map', OccupancyGrid, mapCallBack)
+    #costMapSub = rospy.Subscriber('/move_base/global_costmap/costmap', OccupancyGrid, mapCallBack)
     odomSub = rospy.Subscriber('/odom', Odometry, odomCallBack)
     baseStatusSub = rospy.Subscriber("move_base/result", MoveBaseActionResult, statusCallBack)
 
@@ -730,7 +777,7 @@ if __name__ == '__main__':
 
     rospy.sleep(1)
 
-    rospy.Timer(rospy.Duration(1), displayGrid)
+    rospy.Timer(rospy.Duration(.5), displayGrid)
     rospy.Timer(rospy.Duration(.2), robotLocationCallBack)
 
     rospy.sleep(1)
@@ -747,8 +794,11 @@ if __name__ == '__main__':
 
     print "finished rotating"
     rospy.sleep(3)
-    while(not rospy.is_shutdown()):
+    while(not noFrontiers and not rospy.is_shutdown()):
         centroidSearch2()
+        rospy.sleep(2)
+       # goToWaypoint(((robotX - .2), robotY))
+        displayGrid(data)
 
     #fill map
     #while (boundaries and not rospy.is_shutdown()):
